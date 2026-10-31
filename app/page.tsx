@@ -155,17 +155,13 @@ export default function HomePage() {
       {/* Hero Section */}
       <section className="relative overflow-hidden border-b border-fd-border/40 py-16 sm:py-24">
         <div className="mx-auto max-w-4xl px-4 sm:px-6 text-center">
-          <div className="inline-flex items-center gap-2 rounded-full border border-fd-border bg-fd-muted/50 px-3 py-1 text-xs font-medium text-fd-foreground/80 mb-6">
-            <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
-            <span>Nexium Media Developer & Team Portal</span>
-          </div>
 
           <h1 className="text-3xl font-bold tracking-tight text-fd-foreground sm:text-5xl sm:leading-tight">
-            Scale digital growth, high-converting websites & marketing.
+            The playbook for high-performance websites &amp; digital growth.
           </h1>
 
           <p className="mt-4 text-sm sm:text-base text-fd-muted-foreground max-w-2xl mx-auto leading-relaxed">
-            The central source of truth for Nexium Media team members, engineering standards, performance marketing frameworks, and client deliverables.
+            The definitive knowledge hub for Nexium Media — from production-grade web architecture and design systems to data-driven marketing frameworks.
           </p>
 
           <div className="mt-8">
@@ -193,95 +189,9 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Agency Impact Highlights */}
-      {/* <section className="py-10 border-b border-fd-border/40 bg-fd-muted/20">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
-            <div>
-              <p className="text-2xl sm:text-3xl font-bold text-[#6f00ff]">100+</p>
-              <p className="text-xs text-fd-muted-foreground mt-1">Websites Delivered</p>
-            </div>
-            <div>
-              <p className="text-2xl sm:text-3xl font-bold text-[#6f00ff]">10M+</p>
-              <p className="text-xs text-fd-muted-foreground mt-1">Ad Impressions Managed</p>
-            </div>
-            <div>
-              <p className="text-2xl sm:text-3xl font-bold text-[#6f00ff]">99.9%</p>
-              <p className="text-xs text-fd-muted-foreground mt-1">Uptime Guarantee</p>
-            </div>
-            <div>
-              <p className="text-2xl sm:text-3xl font-bold text-[#6f00ff]">95+</p>
-              <p className="text-xs text-fd-muted-foreground mt-1">Avg. PageSpeed Score</p>
-            </div>
-          </div>
-        </div>
-      </section> */}
+     
 
-      {/* Getting Started Fast Track */}
-      {/* <section className="py-14 border-b border-fd-border/40 bg-fd-background">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-[#6f00ff]">Developer Onboarding</p>
-              <h2 className="text-xl font-bold tracking-tight sm:text-2xl mt-1 text-fd-foreground">
-                Get started in 3 simple steps
-              </h2>
-            </div>
-            <Link
-              href="/docs/getting-started"
-              className="inline-flex items-center gap-1 text-xs font-medium text-fd-foreground hover:underline"
-            >
-              <span>View complete setup guide</span>
-              <ChevronRight className="h-3.5 w-3.5" />
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            <div className="rounded-xl border border-fd-border/70 bg-fd-card p-5 shadow-2xs hover:border-fd-border transition-colors">
-              <div className="flex items-center gap-2.5 text-xs font-semibold text-fd-muted-foreground mb-3">
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-fd-muted text-fd-foreground font-mono text-[11px]">1</span>
-                <span>Setup Toolchain</span>
-              </div>
-              <h3 className="text-sm font-semibold text-fd-foreground">Install Node.js, Git & CLI</h3>
-              <p className="text-xs text-fd-muted-foreground mt-1.5 leading-relaxed">
-                Standardize on Node.js 22 LTS and install the global Nexium Media CLI.
-              </p>
-              <div className="mt-3.5 rounded-lg border border-fd-border/60 bg-fd-muted/40 p-2.5 font-mono text-[11px] text-fd-foreground">
-                npm install -g @nexium/cli
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-fd-border/70 bg-fd-card p-5 shadow-2xs hover:border-fd-border transition-colors">
-              <div className="flex items-center gap-2.5 text-xs font-semibold text-fd-muted-foreground mb-3">
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-fd-muted text-fd-foreground font-mono text-[11px]">2</span>
-                <span>Configure Environment</span>
-              </div>
-              <h3 className="text-sm font-semibold text-fd-foreground">Setup Secrets & Razorpay Test Keys</h3>
-              <p className="text-xs text-fd-muted-foreground mt-1.5 leading-relaxed">
-                Copy local environment parameters and launch local PostgreSQL / Redis containers.
-              </p>
-              <div className="mt-3.5 rounded-lg border border-fd-border/60 bg-fd-muted/40 p-2.5 font-mono text-[11px] text-fd-foreground">
-                docker compose up -d
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-fd-border/70 bg-fd-card p-5 shadow-2xs hover:border-fd-border transition-colors">
-              <div className="flex items-center gap-2.5 text-xs font-semibold text-fd-muted-foreground mb-3">
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-fd-muted text-fd-foreground font-mono text-[11px]">3</span>
-                <span>Launch Client Project</span>
-              </div>
-              <h3 className="text-sm font-semibold text-fd-foreground">Run Development Server</h3>
-              <p className="text-xs text-fd-muted-foreground mt-1.5 leading-relaxed">
-                Start Next.js App Router with hot reload and live MDX compilation.
-              </p>
-              <div className="mt-3.5 rounded-lg border border-fd-border/60 bg-fd-muted/40 p-2.5 font-mono text-[11px] text-fd-foreground">
-                npm run dev
-              </div>
-            </div>
-          </div>
-        </div>
-      </section> */}
-
+     
       {/* Category Grid Section */}
       <section className="py-16">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -413,10 +323,6 @@ export default function HomePage() {
             <Link href="https://www.instagram.com/nexium_media/" target="_blank" className="hover:text-fd-foreground transition-colors">
               Instagram
             </Link>
-            <a href="tel:+918825208872" className="flex items-center gap-1 hover:text-fd-foreground transition-colors">
-              <Phone className="h-3 w-3" />
-              <span>+91-8825208872</span>
-            </a>
           </div>
 
           <div className="flex items-center gap-2 text-xs text-fd-muted-foreground">
