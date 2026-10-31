@@ -1,0 +1,39 @@
+---
+title: Development Overview
+description: Engineering guidelines, code style standards, testing strategies, and system architecture.
+---
+
+# Development Overview
+
+At Acme, we prioritize clean modular architecture, static type safety, and fast local feedback loops. This section provides an architectural map of our software stack.
+
+## Architecture Highlights
+
+- **Frontend**: Next.js App Router, React 19, TypeScript strict mode, Tailwind CSS, Radix UI primitives.
+- **Backend**: Node.js & Go microservices, REST and gRPC interfaces, Prisma ORM, PostgreSQL.
+- **Cache & Queues**: Redis for session cache and distributed rate limiting, Apache Kafka for event-driven asynchronous tasks.
+- **Deployment**: Containerized Docker workloads orchestrated via Kubernetes on AWS / GCP.
+
+## Subsections
+
+Explore frontend and backend guides below:
+
+<Cards>
+  <Card
+    title="Frontend Engineering"
+    href="/docs/development/frontend"
+    description="Folder structure, UI component conventions, Tailwind design tokens, and state management."
+  />
+  <Card
+    title="Backend Engineering"
+    href="/docs/development/backend"
+    description="REST API specs, database schemas, gRPC contracts, and JWT authentication flows."
+  />
+</Cards>
+
+## Code Conventions
+
+1. **TypeScript Everywhere**: Do not use `any`. Always use explicit schemas (Zod or TypeScript types).
+2. **Component Granularity**: Keep UI components small and decoupled from network side-effects.
+3. **Automated Testing**: Target 80%+ branch coverage for mission-critical payment and authentication logic.
+

@@ -1,0 +1,62 @@
+---
+title: UI Components
+description: Design tokens, accessible primitives, and core component usage patterns.
+---
+
+# UI Components
+
+Acme UI components are crafted for high accessibility (WCAG AA compliant), keyboard navigable by default, and responsive across device breakpoints.
+
+## Design Principles
+
+- **Predictable APIs**: Standard prop names like `variant`, `size`, `disabled`, and `asChild`.
+- **Theme Agnostic**: Built on CSS variables (`--fd-background`, `--fd-foreground`, `--fd-primary`).
+- **Composability**: Built on unstyled Radix UI primitives.
+
+## Callout Component
+
+Callouts are used across documentation to highlight important notices, cautions, or tips:
+
+```mdx
+<Callout type="info">This is an informational notice.</Callout>
+<Callout type="tip">This is a best-practice tip.</Callout>
+<Callout type="warn">This is a warning regarding destructive actions.</Callout>
+```
+
+Rendered examples:
+
+<Callout type="info">
+This is an informational notice regarding system maintenance.
+</Callout>
+
+<Callout type="tip">
+Use keyboard shortcut `Cmd + K` or `Ctrl + K` to summon full-text search anywhere.
+</Callout>
+
+<Callout type="warn">
+Never bypass branch protection rules without explicit VP Engineering approval.
+</Callout>
+
+## Code Blocks
+
+Fumadocs provides syntax highlighting, filename headers, and one-click copy buttons out of the box:
+
+```typescript title="lib/auth.ts"
+export async function verifySession(token: string): Promise<UserSession | null> {
+  if (!token) return null;
+  const payload = await jwt.verify(token, process.env.JWT_SECRET!);
+  return payload as UserSession;
+}
+```
+
+## Tabs Component
+
+Present multiple options cleanly:
+
+<Tabs items={["npm", "yarn", "pnpm", "bun"]}>
+  <Tab value="npm">`npm install @acme/ui`</Tab>
+  <Tab value="yarn">`yarn add @acme/ui`</Tab>
+  <Tab value="pnpm">`pnpm add @acme/ui`</Tab>
+  <Tab value="bun">`bun add @acme/ui`</Tab>
+</Tabs>
+

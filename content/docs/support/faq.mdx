@@ -1,0 +1,24 @@
+---
+title: Frequently Asked Questions
+description: Quick answers to common questions about credentials, permissions, rate limits, and billing.
+---
+
+# Frequently Asked Questions
+
+Answers to the most common questions across engineering and product teams.
+
+<Accordions>
+  <Accordion title="How do I request access to production database read-replicas?">
+    Submit a temporary access ticket via the internal IT service desk. Production read access requires VP approval and is granted for a maximum window of 4 hours with comprehensive query audit logging.
+  </Accordion>
+  <Accordion title="Where are API keys generated and rotated?">
+    Navigate to the Developer Settings in the Admin Console. Click **API Credentials** > **Generate New Key**. Remember to store secret keys in a password manager immediately, as they cannot be viewed again once created.
+  </Accordion>
+  <Accordion title="What are the default rate limits for sandbox environments?">
+    Sandbox API keys are limited to 100 requests per minute and 10,000 requests per day. Production tiers start at 5,000 requests per minute.
+  </Accordion>
+  <Accordion title="How do I contribute new pages to this documentation?">
+    Simply create a new `.mdx` file in `content/docs/[category]/` and submit a pull request! Fumadocs automatically detects your new page and adds it to the search index and sidebar navigation.
+  </Accordion>
+</Accordions>
+

@@ -1,0 +1,10 @@
+{
+  "title": "Development",
+  "description": "Engineering standards, architecture, frontend and backend guides",
+  "pages": [
+    "index",
+    "frontend",
+    "backend"
+  ]
+}
+

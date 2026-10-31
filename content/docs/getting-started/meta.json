@@ -1,0 +1,10 @@
+{
+  "title": "Getting Started",
+  "description": "Essential guides to get your development environment running quickly",
+  "pages": [
+    "index",
+    "installation",
+    "first-time-setup"
+  ]
+}
+

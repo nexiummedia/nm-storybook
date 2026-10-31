@@ -1,0 +1,78 @@
+---
+title: Installation Guide
+description: Step-by-step instructions for installing Acme CLI, local toolchains, and dependencies.
+---
+
+# Installation Guide
+
+This guide covers installing the official Acme developer CLI (`acme-cli`) and bootstrapping your local development environment.
+
+## 1. Install Node.js & Package Managers
+
+We standardize on **Node.js 22 LTS**. We recommend managing Node versions using `fnm` or `nvm`:
+
+<Tabs items={["pnpm (Recommended)", "npm", "Homebrew"]}>
+  <Tab value="pnpm (Recommended)">
+  ```bash
+  # Install pnpm globally
+  corepack enable
+  corepack prepare pnpm@latest --activate
+
+  # Verify version
+  pnpm --version
+  ```
+  </Tab>
+  <Tab value="npm">
+  ```bash
+  # Update npm to latest
+  npm install -g npm@latest
+
+  # Verify version
+  npm -v
+  ```
+  </Tab>
+  <Tab value="Homebrew">
+  ```bash
+  # macOS Homebrew install
+  brew install node@22
+  brew install pnpm
+  ```
+  </Tab>
+</Tabs>
+
+## 2. Install the Acme CLI
+
+The Acme CLI provides unified commands for database seeding, microservice orchestration, and token management:
+
+```bash
+npm install -g @acme/cli
+```
+
+Verify your installation:
+
+```bash
+acme --version
+acme auth check
+```
+
+<Callout type="tip">
+Run `acme doctor` to automatically diagnose missing system dependencies or expired access tokens.
+</Callout>
+
+## 3. Clone Repository
+
+Clone the primary repository into your local workspace:
+
+```bash
+git clone git@github.com:acme-corp/platform.git
+cd platform
+```
+
+Install workspace dependencies:
+
+```bash
+npm install
+```
+
+Proceed to the [First-Time Setup](/docs/getting-started/first-time-setup) guide to configure local `.env` variables and start development servers.
+

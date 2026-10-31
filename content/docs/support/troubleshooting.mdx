@@ -1,0 +1,51 @@
+---
+title: Troubleshooting Guide
+description: Step-by-step diagnostic workflows for common development and build issues.
+---
+
+# Troubleshooting Guide
+
+Find quick solutions to common errors encountered during local development and builds.
+
+## 1. Port 3000 Already in Use
+
+If your terminal reports `Error: listen EADDRINUSE: address already in use :::3000`:
+
+```bash
+# Locate the process occupying port 3000 (macOS / Linux)
+lsof -i :3000
+kill -9 <PID>
+
+# On Windows PowerShell
+Get-Process -Id (Get-NetTCPConnection -LocalPort 3000).OwningProcess | Stop-Process
+```
+
+## 2. Docker Container Database Connection Refused
+
+If Prisma or your service fails to connect to PostgreSQL:
+
+```bash
+# Verify container status
+docker ps -a
+
+# Restart database service
+docker compose restart postgres
+
+# Inspect container logs
+docker compose logs postgres --tail 50
+```
+
+## 3. Fumadocs Content Type Generation Issues
+
+If TypeScript indicates that new MDX pages or properties cannot be found:
+
+```bash
+npx fumadocs-mdx
+```
+
+This regenerates the `.source` virtual mapping and types immediately.
+
+<Callout type="tip">
+When running in dev mode (`npm run dev`), Fumadocs automatically watches all `.mdx` files and updates navigation dynamically without needing a server restart!
+</Callout>
+

@@ -1,0 +1,10 @@
+{
+  "title": "Frontend",
+  "description": "Frontend architecture, components, and styling conventions",
+  "pages": [
+    "index",
+    "project-structure",
+    "components"
+  ]
+}
+

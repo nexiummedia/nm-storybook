@@ -1,0 +1,63 @@
+---
+title: Project Structure
+description: Architectural layout of files, directories, and route patterns across our frontend applications.
+---
+
+# Frontend Project Structure
+
+We follow the Next.js App Router conventions with clear separation of concerns across layouts, route segments, and shared UI libraries.
+
+## Directory Layout
+
+<Files>
+  <Folder name="app" defaultOpen>
+    <File name="layout.tsx" />
+    <File name="page.tsx" />
+    <File name="globals.css" />
+    <Folder name="(dashboard)">
+      <File name="layout.tsx" />
+      <File name="page.tsx" />
+    </Folder>
+    <Folder name="api">
+      <Folder name="search">
+        <File name="route.ts" />
+      </Folder>
+    </Folder>
+  </Folder>
+  <Folder name="components" defaultOpen>
+    <Folder name="ui">
+      <File name="button.tsx" />
+      <File name="card.tsx" />
+      <File name="dialog.tsx" />
+    </Folder>
+    <File name="header.tsx" />
+    <File name="sidebar.tsx" />
+  </Folder>
+  <Folder name="lib">
+    <File name="source.ts" />
+    <File name="utils.ts" />
+  </Folder>
+  <Folder name="content">
+    <Folder name="docs" defaultOpen>
+      <File name="meta.json" />
+      <File name="index.mdx" />
+    </Folder>
+  </Folder>
+</Files>
+
+## Architectural Conventions
+
+### 1. Colocation
+Keep styles, unit tests, and helper functions close to the components that consume them.
+
+### 2. Path Aliases
+Always use `@/` alias for root relative imports:
+
+```tsx
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+```
+
+### 3. Server vs Client Boundaries
+Structure components with pure Server Components as orchestrators, passing data down into minimal Client Components for interactivity.
+

@@ -1,0 +1,10 @@
+{
+  "title": "Backend",
+  "description": "Backend services, APIs, and authentication mechanics",
+  "pages": [
+    "index",
+    "api-structure",
+    "authentication"
+  ]
+}
+

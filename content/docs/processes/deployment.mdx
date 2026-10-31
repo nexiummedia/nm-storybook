@@ -1,0 +1,41 @@
+---
+title: Deployment & CI/CD
+description: Automated test suites, deployment pipelines, canary promotions, and instant rollback strategies.
+---
+
+# Deployment & CI/CD
+
+All deployments are fully automated using GitHub Actions workflows and ArgoCD on Kubernetes clusters.
+
+## Continuous Integration Pipeline
+
+Every push triggers the following automated stages in parallel:
+
+```
+Push to branch
+├── Lint & Typecheck (eslint, tsc)
+├── Unit & Integration Tests (vitest, jest)
+├── End-to-End Tests (playwright)
+└── Security Vulnerability Scan (trivy, snyk)
+```
+
+## Deployment Environments
+
+We run three tier environments:
+
+1. **Preview**: Automatically generated ephemeral preview environments for every pull request.
+2. **Staging**: Continuous deployment from the `main` branch. Mimics production infrastructure with scrubbed synthetic data.
+3. **Production**: Scheduled or manual tag release (`v*.*.*`) with automated canary rollout (10% -> 50% -> 100%).
+
+<Callout type="warn">
+Direct commits to `main` are strictly blocked by branch protection rules. All changes must originate from reviewed pull requests.
+</Callout>
+
+## Rollback Procedures
+
+If telemetry detects error spikes exceeding 0.5% during canary rollout, traffic is automatically diverted back to the previous stable release within 15 seconds. Engineers can also initiate an instant manual rollback using:
+
+```bash
+acme release rollback --env production
+```
+

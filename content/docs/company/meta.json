@@ -1,0 +1,11 @@
+{
+  "title": "Company",
+  "description": "About Acme Inc., our mission, principles, and team culture",
+  "pages": [
+    "index",
+    "about-us",
+    "vision-and-mission",
+    "our-team"
+  ]
+}
+

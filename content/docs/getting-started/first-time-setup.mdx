@@ -1,0 +1,70 @@
+---
+title: First-Time Setup
+description: Configure environment variables, database migrations, and local certificates.
+---
+
+# First-Time Setup
+
+Once you have installed the prerequisites and cloned the repository, perform the initial environment configuration before launching services.
+
+## 1. Environment Secrets
+
+Copy the example environment template into your active `.env.local`:
+
+```bash
+cp .env.example .env.local
+```
+
+Fill in the required local configuration parameters:
+
+```bash title=".env.local"
+# Local Application Port
+PORT=3000
+
+# Auth & Cryptography
+NEXTAUTH_SECRET=development_secret_32_characters_long!
+ACME_API_KEY=acme_dev_sandbox_token_99182
+
+# Database Connection (Docker PostgreSQL)
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/acme_dev"
+
+# Feature Flags
+ENABLE_PREVIEW_FEATURES=true
+```
+
+<Callout type="warn">
+Never commit real production secrets, API keys, or private SSH credentials to git. All production secrets are managed in HashiCorp Vault.
+</Callout>
+
+## 2. Boot Local Database
+
+We use Docker Compose to start local PostgreSQL and Redis instances:
+
+```bash
+docker compose up -d
+```
+
+Verify that the containers are healthy:
+
+```bash
+docker ps
+```
+
+## 3. Run Database Migrations
+
+Apply database schemas and seed realistic test accounts:
+
+```bash
+npm run db:migrate
+npm run db:seed
+```
+
+## 4. Start Development Server
+
+Run the development command:
+
+```bash
+npm run dev
+```
+
+Visit `http://localhost:3000` in your browser. You should see the application dashboard loaded with mock seed data!

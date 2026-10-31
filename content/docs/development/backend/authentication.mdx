@@ -1,0 +1,37 @@
+---
+title: Authentication & Security
+description: Security protocols, API keys, JSON Web Tokens (JWT), and Role-Based Access Control (RBAC).
+---
+
+# Authentication & Security
+
+Security is foundational to our platform. All requests against protected Acme APIs require cryptographic verification.
+
+## Authentication Mechanisms
+
+1. **API Keys**: Used for server-to-server automated integration. Keys begin with prefix `acme_live_` or `acme_test_`.
+2. **Bearer JWT Tokens**: Used for authenticated web user sessions, issued upon successful SSO or MFA challenge.
+
+## Making an Authenticated Request
+
+Provide your API key or Bearer token via the `Authorization` header:
+
+```bash
+curl -X GET "https://api.acme.corp/v1/projects" \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json"
+```
+
+<Callout type="warn">
+Never transmit authorization tokens in URL query parameters. Query parameters are logged in load balancers and browser histories.
+</Callout>
+
+## Role-Based Access Control (RBAC)
+
+User permissions are evaluated using four hierarchical roles:
+
+- **Viewer**: Read-only access to published artifacts and team reports.
+- **Member**: Can create, update, and test resources inside assigned projects.
+- **Admin**: Can manage team members, billing, and API tokens.
+- **Owner**: Full organizational governance and deletion rights.
+

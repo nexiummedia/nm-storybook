@@ -1,0 +1,10 @@
+{
+  "title": "Processes",
+  "description": "Engineering workflows, CI/CD, and release management",
+  "pages": [
+    "index",
+    "development-workflow",
+    "deployment"
+  ]
+}
+

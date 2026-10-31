@@ -1,0 +1,10 @@
+{
+  "title": "Support",
+  "description": "Frequently asked questions and troubleshooting guides",
+  "pages": [
+    "index",
+    "faq",
+    "troubleshooting"
+  ]
+}
+

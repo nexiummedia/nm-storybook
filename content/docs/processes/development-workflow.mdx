@@ -1,0 +1,45 @@
+---
+title: Development Workflow
+description: Git branching conventions, Conventional Commits, and code review criteria.
+---
+
+# Development Workflow
+
+Every code change follows a structured lifecycle from feature ticket to production deployment.
+
+## Git Branch Naming
+
+Branches should be named using descriptive prefixes followed by the ticket key and a short kebab-case description:
+
+```bash
+feature/ENG-1042-user-profile-avatar
+bugfix/ENG-902-fix-token-refresh-leak
+chore/ENG-880-upgrade-nextjs-dependencies
+```
+
+## Conventional Commits
+
+We follow the [Conventional Commits](https://www.conventionalcommits.org/) specification:
+
+- `feat:` A new user-facing feature
+- `fix:` A bug fix
+- `docs:` Documentation-only changes
+- `refactor:` Code restructuring without functional changes
+- `test:` Adding or refactoring automated tests
+- `perf:` Performance optimizations
+
+Example commit:
+
+```bash
+git commit -m "feat(auth): add hardware security key WebAuthn support"
+```
+
+## Pull Request Checklist
+
+Before marking a PR as "Ready for Review", ensure:
+
+- [ ] All automated GitHub Actions CI tests pass.
+- [ ] TypeScript compiles cleanly with zero warnings or errors.
+- [ ] Documentation has been added or updated in `content/docs/`.
+- [ ] At least one peer review approval from a codeowner.
+
