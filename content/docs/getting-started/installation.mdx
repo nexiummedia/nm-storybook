@@ -1,20 +1,30 @@
 ---
 title: Installation Guide
-description: Step-by-step instructions for installing Acme CLI, local toolchains, and dependencies.
+description: Step-by-step instructions for installing developer tooling, Node.js, and client project dependencies.
 ---
 
 # Installation Guide
 
-This guide covers installing the official Acme developer CLI (`acme-cli`) and bootstrapping your local development environment.
+This guide covers installing development toolchains for building and maintaining Nexium Media client websites and applications.
 
 ## 1. Install Node.js & Package Managers
 
 We standardize on **Node.js 22 LTS**. We recommend managing Node versions using `fnm` or `nvm`:
 
-<Tabs items={["pnpm (Recommended)", "npm", "Homebrew"]}>
-  <Tab value="pnpm (Recommended)">
+<Tabs items={["npm (Standard)", "pnpm (Fast)", "Homebrew (macOS)"]}>
+  <Tab value="npm (Standard)">
   ```bash
-  # Install pnpm globally
+  # Check Node version
+  node -v
+  # Should output v20.x or v22.x
+
+  # Update npm to latest
+  npm install -g npm@latest
+  ```
+  </Tab>
+  <Tab value="pnpm (Fast)">
+  ```bash
+  # Enable pnpm via corepack
   corepack enable
   corepack prepare pnpm@latest --activate
 
@@ -22,16 +32,7 @@ We standardize on **Node.js 22 LTS**. We recommend managing Node versions using 
   pnpm --version
   ```
   </Tab>
-  <Tab value="npm">
-  ```bash
-  # Update npm to latest
-  npm install -g npm@latest
-
-  # Verify version
-  npm -v
-  ```
-  </Tab>
-  <Tab value="Homebrew">
+  <Tab value="Homebrew (macOS)">
   ```bash
   # macOS Homebrew install
   brew install node@22
@@ -40,32 +41,32 @@ We standardize on **Node.js 22 LTS**. We recommend managing Node versions using 
   </Tab>
 </Tabs>
 
-## 2. Install the Acme CLI
+## 2. Install the Nexium Developer CLI
 
-The Acme CLI provides unified commands for database seeding, microservice orchestration, and token management:
+The Nexium CLI provides commands for scaffolding client websites, synchronizing database models, and generating SEO sitemaps:
 
 ```bash
-npm install -g @acme/cli
+npm install -g @nexium/cli
 ```
 
 Verify your installation:
 
 ```bash
-acme --version
-acme auth check
+nexium --version
+nexium auth status
 ```
 
 <Callout type="tip">
-Run `acme doctor` to automatically diagnose missing system dependencies or expired access tokens.
+Run `nexium doctor` to automatically verify local dependencies, image optimization libraries, and environment variables.
 </Callout>
 
 ## 3. Clone Repository
 
-Clone the primary repository into your local workspace:
+Clone your assigned client website or platform repository:
 
 ```bash
-git clone git@github.com:acme-corp/platform.git
-cd platform
+git clone git@github.com:nexium-media/client-project.git
+cd client-project
 ```
 
 Install workspace dependencies:
@@ -75,4 +76,3 @@ npm install
 ```
 
 Proceed to the [First-Time Setup](/docs/getting-started/first-time-setup) guide to configure local `.env` variables and start development servers.
-

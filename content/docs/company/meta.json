@@ -1,6 +1,6 @@
 {
   "title": "Company",
-  "description": "About Acme Inc., our mission, principles, and team culture",
+  "description": "About Nexium Media, our mission, MSME growth focus, and team culture",
   "pages": [
     "index",
     "about-us",
@@ -8,4 +8,3 @@
     "our-team"
   ]
 }
-

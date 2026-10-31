@@ -1,18 +1,19 @@
 ---
 title: Development Overview
-description: Engineering guidelines, code style standards, testing strategies, and system architecture.
+description: Engineering guidelines, code style standards, testing strategies, and system architecture at Nexium Media.
 ---
 
 # Development Overview
 
-At Acme, we prioritize clean modular architecture, static type safety, and fast local feedback loops. This section provides an architectural map of our software stack.
+At Nexium Media, we prioritize blazing-fast load times, clean modular architecture, static type safety, and seamless responsive design.
 
 ## Architecture Highlights
 
-- **Frontend**: Next.js App Router, React 19, TypeScript strict mode, Tailwind CSS, Radix UI primitives.
-- **Backend**: Node.js & Go microservices, REST and gRPC interfaces, Prisma ORM, PostgreSQL.
-- **Cache & Queues**: Redis for session cache and distributed rate limiting, Apache Kafka for event-driven asynchronous tasks.
-- **Deployment**: Containerized Docker workloads orchestrated via Kubernetes on AWS / GCP.
+- **Frontend**: Next.js App Router, React 19, TypeScript strict mode, Tailwind CSS v4, Lucide React icons.
+- **Backend**: Node.js microservices, Next.js API route handlers, Prisma ORM, PostgreSQL.
+- **Payments & Billing**: Razorpay API integration with webhook signature validation for client bookings and subscriptions.
+- **Analytics & Marketing**: Google Tag Manager, Meta Pixel, automated conversion event tracking, and Google Search Console indexing.
+- **Hosting**: Edge-rendered deployments on Vercel and AWS CloudFront with automated CDN caching.
 
 ## Subsections
 
@@ -22,18 +23,17 @@ Explore frontend and backend guides below:
   <Card
     title="Frontend Engineering"
     href="/docs/development/frontend"
-    description="Folder structure, UI component conventions, Tailwind design tokens, and state management."
+    description="Folder structure, UI component conventions, Tailwind design tokens, and Core Web Vitals optimization."
   />
   <Card
     title="Backend Engineering"
     href="/docs/development/backend"
-    description="REST API specs, database schemas, gRPC contracts, and JWT authentication flows."
+    description="REST API specs, database schemas, Razorpay webhooks, and JWT authentication flows."
   />
 </Cards>
 
 ## Code Conventions
 
-1. **TypeScript Everywhere**: Do not use `any`. Always use explicit schemas (Zod or TypeScript types).
-2. **Component Granularity**: Keep UI components small and decoupled from network side-effects.
-3. **Automated Testing**: Target 80%+ branch coverage for mission-critical payment and authentication logic.
-
+1. **Strict TypeScript**: Never use `any`. Always use explicit schemas (Zod or TypeScript interfaces).
+2. **Performance Budget**: Initial JavaScript bundles must stay under 120KB per page.
+3. **SEO Colocation**: Every page route must export dynamic `Metadata` with OpenGraph images and canonical URLs.

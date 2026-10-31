@@ -1,21 +1,21 @@
 ---
 title: UI Components
-description: Design tokens, accessible primitives, and core component usage patterns.
+description: Design tokens, accessible primitives, and core component usage patterns at Nexium Media.
 ---
 
 # UI Components
 
-Acme UI components are crafted for high accessibility (WCAG AA compliant), keyboard navigable by default, and responsive across device breakpoints.
+Nexium Media UI components are crafted for high accessibility, mobile-first touch targets, and visual consistency across client websites.
 
 ## Design Principles
 
 - **Predictable APIs**: Standard prop names like `variant`, `size`, `disabled`, and `asChild`.
-- **Theme Agnostic**: Built on CSS variables (`--fd-background`, `--fd-foreground`, `--fd-primary`).
-- **Composability**: Built on unstyled Radix UI primitives.
+- **Brand Theming**: Built on CSS variables (`--color-fd-primary: #6f00ff` for Nexium Media violet).
+- **Smooth Feedback**: Interactive hover transitions, ripple states, and accessible ARIA attributes.
 
 ## Callout Component
 
-Callouts are used across documentation to highlight important notices, cautions, or tips:
+Callouts are used across documentation and client portals to highlight essential information:
 
 ```mdx
 <Callout type="info">This is an informational notice.</Callout>
@@ -26,37 +26,36 @@ Callouts are used across documentation to highlight important notices, cautions,
 Rendered examples:
 
 <Callout type="info">
-This is an informational notice regarding system maintenance.
+Client projects must include local business Schema.org JSON-LD structured data for Dhanbad and regional search.
 </Callout>
 
 <Callout type="tip">
-Use keyboard shortcut `Cmd + K` or `Ctrl + K` to summon full-text search anywhere.
+Use keyboard shortcut `Cmd + K` or `Ctrl + K` to summon full-text search anywhere on the portal.
 </Callout>
 
 <Callout type="warn">
-Never bypass branch protection rules without explicit VP Engineering approval.
+Never bypass branch protection rules or push untracked production secrets to git.
 </Callout>
 
 ## Code Blocks
 
-Fumadocs provides syntax highlighting, filename headers, and one-click copy buttons out of the box:
+Fumadocs provides syntax highlighting, filename headers, and copy buttons out of the box:
 
-```typescript title="lib/auth.ts"
-export async function verifySession(token: string): Promise<UserSession | null> {
-  if (!token) return null;
-  const payload = await jwt.verify(token, process.env.JWT_SECRET!);
-  return payload as UserSession;
+```typescript title="lib/analytics.ts"
+export function trackEvent(name: string, properties?: Record<string, unknown>) {
+  if (typeof window !== 'undefined' && (window as any).gtag) {
+    (window as any).gtag('event', name, properties);
+  }
 }
 ```
 
 ## Tabs Component
 
-Present multiple options cleanly:
+Present multiple options or installation commands cleanly:
 
 <Tabs items={["npm", "yarn", "pnpm", "bun"]}>
-  <Tab value="npm">`npm install @acme/ui`</Tab>
-  <Tab value="yarn">`yarn add @acme/ui`</Tab>
-  <Tab value="pnpm">`pnpm add @acme/ui`</Tab>
-  <Tab value="bun">`bun add @acme/ui`</Tab>
+  <Tab value="npm">`npm install @nexium/ui`</Tab>
+  <Tab value="yarn">`yarn add @nexium/ui`</Tab>
+  <Tab value="pnpm">`pnpm add @nexium/ui`</Tab>
+  <Tab value="bun">`bun add @nexium/ui`</Tab>
 </Tabs>
-

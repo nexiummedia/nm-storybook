@@ -1,11 +1,11 @@
 ---
 title: Deployment & CI/CD
-description: Automated test suites, deployment pipelines, canary promotions, and instant rollback strategies.
+description: Automated test suites, deployment pipelines, canary promotions, and instant rollback strategies at Nexium Media.
 ---
 
 # Deployment & CI/CD
 
-All deployments are fully automated using GitHub Actions workflows and ArgoCD on Kubernetes clusters.
+All client websites and platforms are deployed using automated GitHub Actions pipelines and edge-rendered environments on Vercel.
 
 ## Continuous Integration Pipeline
 
@@ -14,28 +14,27 @@ Every push triggers the following automated stages in parallel:
 ```
 Push to branch
 ├── Lint & Typecheck (eslint, tsc)
-├── Unit & Integration Tests (vitest, jest)
-├── End-to-End Tests (playwright)
-└── Security Vulnerability Scan (trivy, snyk)
+├── Component & Visual Tests (vitest)
+├── Lighthouse Performance Checks
+└── Ephemeral Staging URL Generation
 ```
 
 ## Deployment Environments
 
 We run three tier environments:
 
-1. **Preview**: Automatically generated ephemeral preview environments for every pull request.
-2. **Staging**: Continuous deployment from the `main` branch. Mimics production infrastructure with scrubbed synthetic data.
-3. **Production**: Scheduled or manual tag release (`v*.*.*`) with automated canary rollout (10% -> 50% -> 100%).
+1. **Preview**: Automatically generated ephemeral preview URLs for every pull request, allowing designers and clients to preview revisions instantly.
+2. **Staging**: Internal staging server (`staging.client-domain.com`) used for end-to-end integration and client approvals.
+3. **Production**: Live production domain (`www.client-domain.com`) served via Cloudflare CDN with automated SSL certificates.
 
 <Callout type="warn">
-Direct commits to `main` are strictly blocked by branch protection rules. All changes must originate from reviewed pull requests.
+Never connect a live client production domain until DNS TTL has been lowered to 300 seconds and SSL verification is completed.
 </Callout>
 
 ## Rollback Procedures
 
-If telemetry detects error spikes exceeding 0.5% during canary rollout, traffic is automatically diverted back to the previous stable release within 15 seconds. Engineers can also initiate an instant manual rollback using:
+If an unexpected regression is detected after production release, deployments can be instantly reverted within 10 seconds via Vercel instant rollback:
 
 ```bash
-acme release rollback --env production
+vercel rollback [deployment-url]
 ```
-

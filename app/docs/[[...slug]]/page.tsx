@@ -18,10 +18,10 @@ export default async function Page(props: {
     <DocsPage
       toc={page.data.toc}
       full={page.data.full}
-      lastUpdate={new Date("2026-10-30")}
+      lastUpdate={new Date("2026-10-31")}
       editOnGithub={{
-        owner: 'acme-corp',
-        repo: 'platform-docs',
+        owner: 'nexium-media',
+        repo: 'documentation',
         sha: 'main',
         path: `content/docs/${page.path}`,
       }}
@@ -53,9 +53,8 @@ export async function generateMetadata(props: {
     title: page.data.title,
     description: page.data.description,
     openGraph: {
-      title: `${page.data.title} | Acme Docs`,
+      title: `${page.data.title} | Nexium Media Docs`,
       description: page.data.description,
     },
   };
 }
-

@@ -1,8 +1,10 @@
-# Acme Inc. Company Documentation Portal
+# Nexium Media — Company Documentation Portal
 
-A production-ready, modern company documentation portal built with **Next.js (App Router)**, **Fumadocs**, **TypeScript**, and **Tailwind CSS**.
+A production-ready, modern company documentation portal for **Nexium Media** (top website development & digital marketing agency in Dhanbad, Jharkhand), built with **Next.js (App Router)**, **Fumadocs**, **TypeScript**, and **Tailwind CSS**.
 
 Featuring dynamic file-system navigation, full-text documentation search, light/dark mode theming, breadcrumb navigation, interactive MDX components, and automated SEO sitemap generation.
+
+Official Website: [https://www.nexiummedia.com/](https://www.nexiummedia.com/)
 
 ---
 
@@ -17,7 +19,7 @@ Featuring dynamic file-system navigation, full-text documentation search, light/
 - **Breadcrumbs & Previous / Next Page Links**: Context-aware pagination across adjacent documents.
 - **Helpful Page Feedback**: Interactive "Was this page helpful?" widget with optional commentary collection.
 - **Theme Support**: Seamless Light, Dark, and System theme switching persisted via `next-themes`.
-- **Minimalist Aesthetic**: Inspired by Linear, Stripe, Vercel, and Mintlify documentation design.
+- **Signature Nexium Media Theming**: Electric violet primary accent (`#6f00ff`) with minimalist borders and clean typography.
 - **Production Grade SEO**: Dynamic OpenGraph tags, automatic `sitemap.xml`, canonical headers, and `robots.txt`.
 
 ---
@@ -44,8 +46,8 @@ Featuring dynamic file-system navigation, full-text documentation search, light/
 
 ```bash
 # Clone repository
-git clone git@github.com:acme-corp/platform-docs.git
-cd platform-docs
+git clone git@github.com:nexium-media/documentation.git
+cd documentation
 
 # Install dependencies (runs postinstall fumadocs-mdx automatically)
 npm install
@@ -73,7 +75,7 @@ content/
     ├── meta.json                   # Root navigation ordering
     ├── index.mdx                   # /docs (Overview page)
     │
-    ├── company/                    # Category: Company
+    ├── company/                    # Category: Company & Culture
     │   ├── meta.json
     │   ├── index.mdx
     │   ├── about-us.mdx
@@ -89,24 +91,24 @@ content/
     ├── development/                # Category: Development
     │   ├── meta.json
     │   ├── index.mdx
-    │   ├── frontend/               # Subcategory: Frontend
+    │   ├── frontend/               # Subcategory: Website Development
     │   │   ├── meta.json
     │   │   ├── index.mdx
     │   │   ├── project-structure.mdx
     │   │   └── components.mdx
-    │   └── backend/                # Subcategory: Backend
+    │   └── backend/                # Subcategory: Marketing & APIs
     │       ├── meta.json
     │       ├── index.mdx
     │       ├── api-structure.mdx
     │       └── authentication.mdx
     │
-    ├── processes/                  # Category: Processes
+    ├── processes/                  # Category: Processes & QA
     │   ├── meta.json
     │   ├── index.mdx
     │   ├── development-workflow.mdx
     │   └── deployment.mdx
     │
-    └── support/                    # Category: Support
+    └── support/                    # Category: Support & FAQ
         ├── meta.json
         ├── index.mdx
         ├── faq.mdx
@@ -125,7 +127,7 @@ content/
 ```mdx
 ---
 title: CLI Commands
-description: Complete command-line reference for the Acme CLI.
+description: Complete command-line reference for Nexium Media developer tools.
 ---
 
 # CLI Commands
@@ -135,9 +137,9 @@ Welcome to the CLI reference.
 ## Available Commands
 
 ```bash
-acme init
-acme dev
-acme deploy
+nexium init
+nexium dev
+nexium deploy
 ```
 ```
 
@@ -169,8 +171,8 @@ To explicitly order pages in the sidebar or define custom folder labels, edit or
 2. Add a `meta.json`:
    ```json
    {
-     "title": "Security & Compliance",
-     "description": "Audits, certifications, and data privacy"
+     "title": "Digital Marketing",
+     "description": "Meta ads, Google Ads, and performance marketing playbooks"
    }
    ```
 3. Add an `index.mdx` overview file.
@@ -178,12 +180,12 @@ To explicitly order pages in the sidebar or define custom folder labels, edit or
 
 ### How to Create a Subcategory (Nested Folder)
 
-1. Create a subfolder inside any existing category, e.g. `content/docs/development/mobile/`.
+1. Create a subfolder inside any existing category, e.g. `content/docs/development/ecommerce/`.
 2. Add `meta.json` and `.mdx` files:
    ```json
    {
-     "title": "Mobile Apps",
-     "pages": ["index", "ios-setup", "android-setup"]
+     "title": "eCommerce Stores",
+     "pages": ["index", "razorpay-setup", "inventory"]
    }
    ```
 3. In parent `meta.json` (`content/docs/development/meta.json`), list the subfolder in `pages`:
@@ -194,7 +196,7 @@ To explicitly order pages in the sidebar or define custom folder labels, edit or
        "index",
        "frontend",
        "backend",
-       "mobile"
+       "ecommerce"
      ]
    }
    ```
@@ -203,12 +205,12 @@ To explicitly order pages in the sidebar or define custom folder labels, edit or
 
 ## 6. How to Add Images
 
-Store static assets in the Next.js `public/` directory (e.g., `public/images/architecture.png`).
+Store static assets in the Next.js `public/` directory (e.g., `public/images/analytics-dashboard.png`).
 
 Reference images using standard Markdown syntax or HTML:
 
 ```mdx
-![Architecture Diagram](/images/architecture.png)
+![Analytics Dashboard](/images/analytics-dashboard.png)
 ```
 
 Images automatically render with responsive constraints and rounded borders.
@@ -222,17 +224,17 @@ Fumadocs supports rich interactive MDX components out of the box:
 ### Callouts
 
 ```mdx
-<Callout type="info">Informational note for developers.</Callout>
-<Callout type="tip">Pro-tip for keyboard shortcuts.</Callout>
-<Callout type="warn">Warning for potential data destruction.</Callout>
+<Callout type="info">Informational note for team members.</Callout>
+<Callout type="tip">Pro-tip for Core Web Vitals optimization.</Callout>
+<Callout type="warn">Warning for live DNS cutovers.</Callout>
 ```
 
 ### Cards & Card Grids
 
 ```mdx
 <Cards>
-  <Card title="Frontend" href="/docs/development/frontend" description="UI components and styling standards." />
-  <Card title="Backend" href="/docs/development/backend" description="APIs, microservices, and databases." />
+  <Card title="Website Development" href="/docs/development/frontend" description="UI components and styling standards." />
+  <Card title="Marketing & APIs" href="/docs/development/backend" description="Lead generation pipelines and payments." />
 </Cards>
 ```
 
@@ -240,9 +242,9 @@ Fumadocs supports rich interactive MDX components out of the box:
 
 ```mdx
 <Tabs items={["npm", "pnpm", "bun"]}>
-  <Tab value="npm">npm install @acme/sdk</Tab>
-  <Tab value="pnpm">pnpm add @acme/sdk</Tab>
-  <Tab value="bun">bun add @acme/sdk</Tab>
+  <Tab value="npm">npm install @nexium/ui</Tab>
+  <Tab value="pnpm">pnpm add @nexium/ui</Tab>
+  <Tab value="bun">bun add @nexium/ui</Tab>
 </Tabs>
 ```
 
@@ -251,7 +253,7 @@ Fumadocs supports rich interactive MDX components out of the box:
 ```mdx
 <Steps>
 ### Step 1: Clone repo
-Run `git clone git@github.com:acme-corp/platform.git`
+Run `git clone git@github.com:nexium-media/client-project.git`
 
 ### Step 2: Configure secrets
 Copy `.env.example` to `.env.local`
@@ -265,11 +267,11 @@ Execute `npm run db:migrate`
 
 ```mdx
 <Accordions>
-  <Accordion title="How do I rotate API keys?">
-    Visit the developer admin portal under settings.
+  <Accordion title="How long does website delivery take?">
+    Standard business websites are delivered within 2 to 3 weeks.
   </Accordion>
-  <Accordion title="What are default rate limits?">
-    100 requests per minute in sandbox, 5,000 in production.
+  <Accordion title="How do client payments work?">
+    Secure payments via Razorpay or direct bank transfer.
   </Accordion>
 </Accordions>
 ```
@@ -321,7 +323,7 @@ This repository is optimized for zero-config deployment on Vercel:
 1. Push your repository to GitHub / GitLab.
 2. Import the project in Vercel.
 3. The build command (`next build`) and output directory will be detected automatically.
-4. Set optional environment variable `NEXT_PUBLIC_SITE_URL` for sitemap and canonical domains.
+4. Set optional environment variable `NEXT_PUBLIC_SITE_URL` (default: `https://www.nexiummedia.com`).
 
 ---
 
@@ -331,22 +333,22 @@ This repository comes pre-populated with **21 realistic, fully authored document
 
 1. **[Documentation Overview](/docs)**: Portal landing, principles, and index.
 2. **[Company Overview](/docs/company)**: Operating philosophy and business model.
-3. **[About Us](/docs/company/about-us)**: Founding story, team hubs, and milestones.
-4. **[Vision & Mission](/docs/company/vision-and-mission)**: Core tenets and 5-year outlook.
-5. **[Our Team](/docs/company/our-team)**: Cross-functional Pod structure and departments.
-6. **[Getting Started](/docs/getting-started)**: Workstation prerequisites and path.
+3. **[About Us](/docs/company/about-us)**: Founding story, Dhanbad headquarters, and milestones.
+4. **[Vision & Mission](/docs/company/vision-and-mission)**: Core tenets and MSME growth outlook.
+5. **[Our Team](/docs/company/our-team)**: Organizational squads and department roles.
+6. **[Getting Started](/docs/getting-started)**: Workstation prerequisites and onboarding path.
 7. **[Installation Guide](/docs/getting-started/installation)**: Node.js, pnpm, and CLI setup.
-8. **[First-Time Setup](/docs/getting-started/first-time-setup)**: Secrets, Docker Compose, and databases.
+8. **[First-Time Setup](/docs/getting-started/first-time-setup)**: Secrets, Razorpay test keys, and databases.
 9. **[Development Overview](/docs/development)**: Architecture stack map.
-10. **[Frontend Overview](/docs/development/frontend)**: Next.js and Tailwind standards.
+10. **[Frontend Overview](/docs/development/frontend)**: Next.js, React 19, and Tailwind standards.
 11. **[Frontend Project Structure](/docs/development/frontend/project-structure)**: Directory layout.
 12. **[UI Components](/docs/development/frontend/components)**: Accessible primitives and design tokens.
-13. **[Backend Overview](/docs/development/backend)**: Microservices and data storage.
-14. **[API Structure](/docs/development/backend/api-structure)**: RESTful schemas and pagination.
-15. **[Authentication & Security](/docs/development/backend/authentication)**: JWTs, API keys, and RBAC.
-16. **[Engineering Processes](/docs/processes)**: Operational workflows overview.
-17. **[Development Workflow](/docs/processes/development-workflow)**: Conventional Commits and PRs.
-18. **[Deployment & CI/CD](/docs/processes/deployment)**: GitHub Actions and canary rollouts.
-19. **[Support & Help Center](/docs/support)**: Contact SLA matrix and channels.
-20. **[Frequently Asked Questions](/docs/support/faq)**: Common engineering and account queries.
-21. **[Troubleshooting Guide](/docs/support/troubleshooting)**: Diagnostic workflows and fixes.
+13. **[Backend Overview](/docs/development/backend)**: Microservices, APIs, and data storage.
+14. **[API Structure](/docs/development/backend/api-structure)**: RESTful schemas, lead payloads, and pagination.
+15. **[Authentication & Security](/docs/development/backend/authentication)**: JWTs, API keys, and RBAC roles.
+16. **[Delivery Processes](/docs/processes)**: Operational workflows overview.
+17. **[Development Workflow](/docs/processes/development-workflow)**: Conventional Commits and PR checklist.
+18. **[Deployment & CI/CD](/docs/processes/deployment)**: GitHub Actions and Vercel rollouts.
+19. **[Support & Help Center](/docs/support)**: Contact SLA matrix and direct phone lines.
+20. **[Frequently Asked Questions](/docs/support/faq)**: Common client and agency queries.
+21. **[Troubleshooting Guide](/docs/support/troubleshooting)**: Diagnostic workflows and local fixes.

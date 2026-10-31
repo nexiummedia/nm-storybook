@@ -5,7 +5,7 @@ description: Configure environment variables, database migrations, and local cer
 
 # First-Time Setup
 
-Once you have installed the prerequisites and cloned the repository, perform the initial environment configuration before launching services.
+Once you have installed the prerequisites and cloned a project repository, perform the initial environment configuration before launching services.
 
 ## 1. Environment Secrets
 
@@ -23,17 +23,21 @@ PORT=3000
 
 # Auth & Cryptography
 NEXTAUTH_SECRET=development_secret_32_characters_long!
-ACME_API_KEY=acme_dev_sandbox_token_99182
+NEXIUM_API_KEY=nexium_sandbox_token_88252
 
-# Database Connection (Docker PostgreSQL)
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/acme_dev"
+# Database Connection (PostgreSQL)
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/nexium_dev"
 
-# Feature Flags
-ENABLE_PREVIEW_FEATURES=true
+# Razorpay Sandbox Credentials
+RAZORPAY_KEY_ID="rzp_test_sampleKey"
+RAZORPAY_KEY_SECRET="sampleSecretKey"
+
+# Site Metadata
+NEXT_PUBLIC_SITE_URL="https://www.nexiummedia.com"
 ```
 
 <Callout type="warn">
-Never commit real production secrets, API keys, or private SSH credentials to git. All production secrets are managed in HashiCorp Vault.
+Never commit live production credentials, client Stripe/Razorpay live keys, or AWS tokens to git. Production keys are securely provisioned via Vercel and AWS Secrets Manager.
 </Callout>
 
 ## 2. Boot Local Database
@@ -61,10 +65,10 @@ npm run db:seed
 
 ## 4. Start Development Server
 
-Run the development command:
+Run the development command with Turbopack:
 
 ```bash
 npm run dev
 ```
 
-Visit `http://localhost:3000` in your browser. You should see the application dashboard loaded with mock seed data!
+Visit `http://localhost:3000` in your browser. You should see the application loaded with live hot-reloading!

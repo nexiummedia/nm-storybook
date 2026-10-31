@@ -15,17 +15,17 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    template: "%s | Acme Docs",
-    default: "Acme Inc. Documentation",
+    template: "%s | Nexium Media Docs",
+    default: "Nexium Media Documentation",
   },
   description:
-    "Official developer and company documentation for Acme Inc. Explore guides, API architecture, frontend components, and workflows.",
-  metadataBase: new URL("https://docs.acme.corp"),
+    "Official developer and company documentation for Nexium Media — website development, performance marketing, SEO, and digital growth platform.",
+  metadataBase: new URL("https://docs.nexiummedia.com"),
   openGraph: {
-    title: "Acme Inc. Documentation",
+    title: "Nexium Media Documentation",
     description:
-      "Modern documentation portal for Acme engineering, product, and operations.",
-    siteName: "Acme Docs",
+      "Modern documentation portal for Nexium Media engineering, digital marketing, website development, and client delivery standards.",
+    siteName: "Nexium Media Docs",
     type: "website",
   },
 };

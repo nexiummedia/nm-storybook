@@ -1,21 +1,20 @@
 ---
 title: Backend Overview
-description: Overview of backend architecture, database schemas, and microservice communications.
+description: Overview of backend architecture, database schemas, and microservice communications at Nexium Media.
 ---
 
 # Backend Overview
 
-The Acme backend infrastructure is composed of high-throughput services communicating via asynchronous event streams and synchronous gRPC/REST APIs.
+The Nexium Media backend architecture powers client websites, lead capture pipelines, payment gateways, and analytics dashboards.
 
 ## Architecture Characteristics
 
-- **Stateless Services**: All microservice containers are stateless to allow horizontal auto-scaling in Kubernetes.
-- **Relational Integrity**: PostgreSQL with Prisma ORM handles primary transactional data.
-- **High-Speed Cache**: Redis cluster handles session storage, cached read-replicas, and distributed rate limiting.
-- **Idempotent APIs**: All state-modifying requests support `Idempotency-Key` headers.
+- **Serverless & Edge Routes**: API handlers deployed to edge regions for single-digit millisecond response times.
+- **Transactional Data**: PostgreSQL with Prisma ORM for relational schemas (leads, clients, billing).
+- **Payment Processing**: Direct integration with Razorpay for Indian domestic transactions and Stripe for international accounts.
+- **Reliable Webhooks**: Automated idempotent handling for lead notifications and payment status updates.
 
 ## Subsections
 
 - **[API Structure](/docs/development/backend/api-structure)**: RESTful endpoints, error envelopes, and rate limits.
-- **[Authentication](/docs/development/backend/authentication)**: Bearer tokens, OAuth2, and RBAC authorization policies.
-
+- **[Authentication](/docs/development/backend/authentication)**: Bearer tokens, API keys, and RBAC authorization policies.

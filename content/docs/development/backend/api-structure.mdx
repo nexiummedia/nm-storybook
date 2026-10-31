@@ -5,7 +5,7 @@ description: RESTful URL patterns, JSON response envelopes, status codes, and pa
 
 # API Structure
 
-All public and internal Acme APIs adhere to RESTful conventions, versioned under `/v1/`.
+All public and internal Nexium Media APIs adhere to standardized RESTful conventions, versioned under `/v1/`.
 
 ## Standard Response Envelope
 
@@ -15,10 +15,12 @@ All API endpoints return JSON payloads wrapped in an envelope structure:
 {
   "success": true,
   "data": {
-    "id": "usr_981a2b",
-    "name": "Alex Mercer",
-    "email": "alex@acme.corp",
-    "role": "admin"
+    "id": "lead_981a2b",
+    "clientName": "Dhanbad Steel Works",
+    "contactPerson": "Rahul Verma",
+    "email": "rahul@dhanbadsteel.com",
+    "phone": "+91-9876543210",
+    "package": "Growth Tier (Web + SEO)"
   },
   "meta": {
     "requestId": "req_01hx8m5z",
@@ -31,8 +33,8 @@ All API endpoints return JSON payloads wrapped in an envelope structure:
 {
   "success": false,
   "error": {
-    "code": "RESOURCE_NOT_FOUND",
-    "message": "User with the requested ID could not be located.",
+    "code": "INVALID_LEAD_PAYLOAD",
+    "message": "Valid phone number or email address is required.",
     "details": []
   },
   "meta": {
@@ -49,7 +51,7 @@ We use semantic HTTP response codes:
 | Code | Meaning | Use Case |
 | :--- | :--- | :--- |
 | `200 OK` | Success | Successful read or update |
-| `201 Created` | Resource Created | Successful POST creation |
+| `201 Created` | Resource Created | Successful POST creation (lead submission) |
 | `400 Bad Request` | Validation Error | Malformed body or missing required field |
 | `401 Unauthorized` | Missing / Invalid Token | Expired JWT or missing Bearer header |
 | `403 Forbidden` | Insufficient Permissions | User lacks role to perform action |
@@ -61,6 +63,5 @@ We use semantic HTTP response codes:
 For list endpoints, cursor-based pagination is used:
 
 ```bash
-GET /v1/users?limit=25&cursor=usr_981a2b
+GET /v1/leads?limit=25&cursor=lead_981a2b
 ```
-

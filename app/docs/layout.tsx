@@ -1,7 +1,7 @@
 import { DocsLayout } from 'fumadocs-ui/layouts/docs';
 import type { ReactNode } from 'react';
 import { source } from '@/lib/source';
-import { BookOpen } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 
 export default function Layout({ children }: { children: ReactNode }) {
   return (
@@ -10,10 +10,10 @@ export default function Layout({ children }: { children: ReactNode }) {
       nav={{
         title: (
           <div className="flex items-center gap-2.5 font-semibold text-fd-foreground">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-fd-primary text-fd-primary-foreground shadow-xs">
-              <BookOpen className="h-4 w-4" />
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#6f00ff] text-white shadow-xs">
+              <Sparkles className="h-4 w-4" />
             </div>
-            <span className="text-sm font-semibold tracking-tight">Acme Docs</span>
+            <span className="text-sm font-semibold tracking-tight">Nexium Media Docs</span>
           </div>
         ),
         url: '/',
@@ -45,10 +45,9 @@ export default function Layout({ children }: { children: ReactNode }) {
           url: '/docs/support',
         },
       ]}
-      githubUrl="https://github.com/acme-corp/platform"
+      githubUrl="https://github.com/nexium-media"
     >
       {children}
     </DocsLayout>
   );
 }
-

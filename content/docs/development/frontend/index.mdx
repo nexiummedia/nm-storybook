@@ -1,19 +1,19 @@
 ---
 title: Frontend Overview
-description: Overview of frontend technology stack, principles, and UI development workflow.
+description: Overview of frontend technology stack, principles, and UI development workflow at Nexium Media.
 ---
 
 # Frontend Overview
 
-Our frontend architecture is engineered for performance, accessible interaction, and predictable state transitions.
+Our frontend architecture is engineered for conversion rate optimization (CRO), lightning-fast page transitions, and effortless responsiveness across every mobile screen.
 
 ## Stack & Standards
 
 - **Framework**: Next.js App Router (React Server Components by default)
-- **Styling**: Tailwind CSS with CSS custom variables for dark/light themes
+- **Styling**: Tailwind CSS with custom CSS variables for light/dark themes
 - **Icons**: Lucide React
-- **Validation**: Zod for client/server form validation
-- **State**: Server State via React Query; lightweight local UI state via React hooks
+- **Forms**: React Hook Form with Zod validation
+- **State**: React Query for async server state; lightweight React hooks for UI interactions
 
 ## Quick Navigation
 
@@ -21,6 +21,5 @@ Our frontend architecture is engineered for performance, accessible interaction,
 - **[Component Library](/docs/development/frontend/components)**: Reusable buttons, inputs, modals, cards, and design tokens.
 
 <Callout type="tip">
-Prefer React Server Components for data fetching. Only add `'use client'` at the leaf nodes that require event listeners or browser APIs.
+All client landing pages must pass Google Mobile-Friendly tests and score 90+ on Lighthouse Performance before entering staging review.
 </Callout>
-

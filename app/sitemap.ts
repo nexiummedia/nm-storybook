@@ -2,7 +2,7 @@ import type { MetadataRoute } from 'next';
 import { source } from '@/lib/source';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://docs.acme.corp';
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.nexiummedia.com';
 
   const docEntries = source.getPages().map((page) => ({
     url: `${baseUrl}${page.url}`,
@@ -21,4 +21,3 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...docEntries,
   ];
 }
-
