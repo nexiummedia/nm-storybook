@@ -1,0 +1,150 @@
+---
+title: Unit Testing Python Backends with Pytest
+description: Pytest configuration, asynchronous test suites with pytest-asyncio, repository mocking, fixtures, and parametrized tests.
+---
+
+Pytest is the standard test runner for Python applications at Nexium Media. Combined with `pytest-asyncio` and `unittest.mock`, it provides an expressive framework for testing asynchronous services.
+
+---
+
+## 1. Pytest Configuration
+
+Configure Pytest in `pyproject.toml`:
+
+```toml title="pyproject.toml"
+[tool.pytest.ini_options]
+minversion = "8.0"
+addopts = "-ra -q --strict-markers --cov=app --cov-report=term-missing"
+testpaths = ["tests/unit"]
+asyncio_mode = "auto"
+
+[tool.coverage.run]
+branch = true
+omit = ["*/tests/*", "app/main.py"]
+```
+
+---
+
+## 2. Reusable Fixtures in `tests/conftest.py`
+
+Fixtures provide clean, isolated dependencies for tests:
+
+```python title="tests/conftest.py"
+import pytest
+from unittest.mock import AsyncMock
+from app.repositories.user_repository import IUserRepository
+from app.models.user import UserModel
+
+@pytest.fixture
+def mock_user_repo() -> AsyncMock:
+    repo = AsyncMock(spec=IUserRepository)
+    return repo
+
+@pytest.fixture
+def sample_user_model() -> UserModel:
+    return UserModel(
+        id="usr_8b91a27e",
+        email="dev@nexiummedia.com",
+        full_name="Nexium Engineer",
+        password_hash="$2b$12$samplehashedpassword",
+        role="MEMBER",
+        is_active=True,
+    )
+```
+
+---
+
+## 3. Testing an Asynchronous Service Class
+
+Use `AsyncMock` to verify service behavior without database connectivity:
+
+```python title="tests/unit/services/test_user_service.py"
+import pytest
+from app.services.user_service import UserService
+from app.schemas.user import UserCreateSchema
+from app.utils.exceptions import DomainException
+
+@pytest.mark.asyncio
+async def test_register_user_success(mock_user_repo, sample_user_model):
+    # 1. Arrange: Mock repository responses
+    mock_user_repo.get_by_email.return_value = None
+    mock_user_repo.create.return_value = sample_user_model
+
+    service = UserService(mock_user_repo)
+    payload = UserCreateSchema(
+        email="dev@nexiummedia.com",
+        password="ValidPassword123!",
+        full_name="Nexium Engineer",
+    )
+
+    # 2. Act
+    result = await service.register_user(payload)
+
+    # 3. Assert
+    mock_user_repo.get_by_email.assert_awaited_once_with("dev@nexiummedia.com")
+    mock_user_repo.create.assert_awaited_once()
+    assert result.email == "dev@nexiummedia.com"
+    assert result.full_name == "Nexium Engineer"
+
+@pytest.mark.asyncio
+async def test_register_user_duplicate_email_raises_exception(mock_user_repo, sample_user_model):
+    # Arrange: Simulate user already existing
+    mock_user_repo.get_by_email.return_value = sample_user_model
+    service = UserService(mock_user_repo)
+    payload = UserCreateSchema(
+        email="dev@nexiummedia.com",
+        password="Password123!",
+        full_name="Duplicate User",
+    )
+
+    # Act & Assert
+    with pytest.raises(DomainException) as exc_info:
+        await service.register_user(payload)
+
+    assert exc_info.value.code == "EMAIL_EXISTS"
+    assert exc_info.value.status_code == 409
+    mock_user_repo.create.assert_not_awaited()
+```
+
+---
+
+## 4. Parametrized Testing with `@pytest.mark.parametrize`
+
+Parametrization runs a single test function across multiple input variations:
+
+```python title="tests/unit/validators/test_password.py"
+import pytest
+from pydantic import ValidationError
+from app.schemas.auth import PasswordSchema
+
+@pytest.mark.parametrize(
+    "invalid_password",
+    [
+        "short",             # Less than 8 characters
+        "alllowercase123!", # Missing uppercase
+        "ALLUPPERCASE123!", # Missing lowercase
+        "NoSpecialChar123", # Missing symbol
+    ],
+)
+def test_password_validation_rules(invalid_password: str):
+    with pytest.raises(ValidationError):
+        PasswordSchema(password=invalid_password)
+```
+
+---
+
+## 5. Common Pytest Mistakes
+
+<Callout type="warning">
+1. **Using `MagicMock` Instead of `AsyncMock`**: If your service calls `await self.repo.find(...)` and you pass a synchronous `MagicMock`, Python raises `TypeError: object MagicMock can't be used in 'await' expression`. Always use `AsyncMock` for async methods.
+2. **Missing `asyncio_mode = "auto"`**: Forgetting to configure async mode in `pyproject.toml` requires decorating every async test with `@pytest.mark.asyncio`.
+3. **Modifying Mutable Fixture Objects**: If multiple tests share a dictionary or list from a fixture without creating fresh instances, side effects leak between tests.
+</Callout>
+
+---
+
+## Related
+
+- [FastAPI Fundamentals](/docs/development/backend/python-fastapi/fastapi-fundamentals)
+- [Integration Testing with HTTPX](/docs/development/backend/testing/integration-testing)
+- [Pydantic v2 Models](/docs/development/backend/python-fastapi/pydantic-models)

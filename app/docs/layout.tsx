@@ -1,7 +1,7 @@
 import { DocsLayout } from 'fumadocs-ui/layouts/docs';
 import type { ReactNode } from 'react';
+import Image from 'next/image';
 import { source } from '@/lib/source';
-import { Sparkles } from 'lucide-react';
 
 export default function Layout({ children }: { children: ReactNode }) {
   return (
@@ -9,11 +9,18 @@ export default function Layout({ children }: { children: ReactNode }) {
       tree={source.pageTree}
       nav={{
         title: (
-          <div className="flex items-center gap-2.5 font-semibold text-fd-foreground">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#6f00ff] text-white shadow-xs">
-              <Sparkles className="h-4 w-4" />
+          <div className="flex items-center font-semibold text-fd-foreground">
+            <div className="relative flex  items-center justify-center overflow-hidden">
+              <Image
+                src="/Nlogo.png"
+                alt="Nexium Media"
+                width={28}
+                height={28}
+                className="h-full w-full object-cover"
+                priority
+              />
             </div>
-            <span className="text-sm font-semibold tracking-tight">Nexium Media Docs</span>
+            <span className="text-sm font-semibold tracking-tight">Docs</span>
           </div>
         ),
         url: '/',
@@ -35,6 +42,10 @@ export default function Layout({ children }: { children: ReactNode }) {
         {
           text: 'Engineering',
           url: '/docs/development',
+        },
+        {
+          text: 'AI & Prompts',
+          url: '/docs/prompt-engineering',
         },
         {
           text: 'Processes',

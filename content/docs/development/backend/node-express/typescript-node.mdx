@@ -1,0 +1,176 @@
+---
+title: Advanced TypeScript for Node.js Backends
+description: Strict type inference, generic request handlers, runtime schema typing with Zod, and declaration merging in Express.
+---
+
+TypeScript transforms Express from a loosely-typed JavaScript framework into an enterprise-grade, statically-checked API platform. This guide documents the advanced typing patterns enforced across Nexium Media backends.
+
+---
+
+## 1. Type-Safe Environment Configuration with Zod
+
+Never access `process.env` directly in business logic. Validate all environment variables at startup and export a typed, read-only configuration object:
+
+```ts title="src/config/index.ts"
+import dotenv from 'dotenv';
+import { z } from 'zod';
+
+dotenv.config();
+
+const envSchema = z.object({
+  NODE_ENV: z.enum(['development', 'staging', 'production', 'test']).default('development'),
+  PORT: z.coerce.number().default(4000),
+  HOST: z.string().default('0.0.0.0'),
+  APP_NAME: z.string().default('nm-express-service'),
+  DATABASE_URL: z.string().url(),
+  JWT_ACCESS_SECRET: z.string().min(32),
+  JWT_REFRESH_SECRET: z.string().min(32),
+  JWT_ACCESS_EXPIRY: z.string().default('15m'),
+  JWT_REFRESH_EXPIRY: z.string().default('7d'),
+  CORS_ORIGIN: z.string().default('http://localhost:3000'),
+  REDIS_URL: z.string().url().optional(),
+});
+
+export type Config = z.infer<typeof envSchema>;
+
+const parsed = envSchema.safeParse(process.env);
+
+if (!parsed.success) {
+  console.error('❌ FATAL: Invalid environment variables detected at startup:');
+  console.error(JSON.stringify(parsed.error.format(), null, 2));
+  process.exit(1);
+}
+
+export const config: Config = Object.freeze(parsed.data);
+```
+
+<Callout type="tip">
+Using `z.coerce.number()` automatically parses strings like `"4000"` from `process.env.PORT` into typed numbers without manual `parseInt()` calls.
+</Callout>
+
+---
+
+## 2. Type-Safe Request Wrappers (`TypedRequest`)
+
+Express route handlers default to `Request<ParamsDictionary, any, any, ParsedQs>`. To eliminate `any` across your controllers, use our `TypedRequest` utility:
+
+```ts title="src/types/api.types.ts"
+import { Request } from 'express';
+import * as core from 'express-serve-static-core';
+
+export type TypedRequest<
+  Body = Record<string, unknown>,
+  Params = core.ParamsDictionary,
+  Query = core.Query
+> = Request<Params, unknown, Body, Query>;
+```
+
+### Usage in Controllers
+
+```ts title="src/controllers/product.controller.ts"
+import { Response } from 'express';
+import { TypedRequest } from '../types/api.types.js';
+import { CreateProductInput, ProductQueryInput } from '../validators/product.validator.js';
+
+export const createProduct = async (
+  req: TypedRequest<CreateProductInput, { workspaceId: string }, ProductQueryInput>,
+  res: Response
+): Promise<void> => {
+  // req.body is strongly typed to CreateProductInput
+  const { title, price } = req.body;
+
+  // req.params is strongly typed to { workspaceId: string }
+  const { workspaceId } = req.params;
+
+  // req.query is strongly typed to ProductQueryInput
+  const { category } = req.query;
+
+  res.status(201).json({ title, price, workspaceId, category });
+};
+```
+
+---
+
+## 3. Deriving Types from Zod Schemas (`z.infer`)
+
+Never manually duplicate TypeScript interfaces when a Zod validation schema exists. Derive the static type directly using `z.infer`:
+
+```ts title="src/validators/user.validator.ts"
+import { z } from 'zod';
+
+export const createUserSchema = z.object({
+  email: z.string().email('Valid email address required').toLowerCase().trim(),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+  fullName: z.string().min(2).max(100).trim(),
+  role: z.enum(['MEMBER', 'ADMIN', 'MANAGER']).default('MEMBER'),
+});
+
+// Single source of truth: TypeScript type is automatically synchronized!
+export type CreateUserInput = z.infer<typeof createUserSchema>;
+```
+
+---
+
+## 4. Declaration Merging for Express Context
+
+When middleware attaches data to the Express `Request` object (e.g. `req.user`, `req.id`), inform the TypeScript compiler via ambient declaration merging:
+
+```ts title="src/types/express.d.ts"
+import { UserRole } from '@prisma/client';
+
+export interface AuthContext {
+  userId: string;
+  email: string;
+  role: UserRole;
+  sessionId: string;
+}
+
+declare global {
+  namespace Express {
+    interface Request {
+      id: string;
+      user?: AuthContext;
+      startTime?: number;
+    }
+  }
+}
+
+export {};
+```
+
+---
+
+## 5. Utilizing the `satisfies` Operator
+
+Use the TypeScript `satisfies` operator to validate that an object literal matches a contract without widening its inferred type:
+
+```ts
+import { RouteConfig } from '../types/route.types.js';
+
+export const apiRoutes = {
+  health: { path: '/health', method: 'GET', public: true },
+  users: { path: '/users', method: 'GET', public: false },
+} satisfies Record<string, RouteConfig>;
+
+// Exact key and literal types are preserved!
+const isPublic = apiRoutes.health.public; // boolean true, not boolean
+```
+
+---
+
+## Common TypeScript Anti-Patterns in Node.js
+
+<Callout type="error">
+**Avoid These Coding Anti-Patterns**:
+1. **Using `any` for Request Bodies**: Typing `req.body as any` bypasses compile-time checks and allows runtime crashes. Always use `TypedRequest` or Zod parsing.
+2. **Non-Null Assertions (`!`) on Unvalidated Inputs**: Writing `req.headers.authorization!.split(' ')` will throw an unhandled `TypeError` if the client omits the header. Always guard with conditional checks.
+3. **Implicit `any` in Error Catches**: In TypeScript strict mode, caught errors default to `unknown`. Do not cast blindly to `any`; verify instances using `err instanceof Error` or `err instanceof AppError`.
+</Callout>
+
+---
+
+## Related
+
+- [Express Controllers & Services](/docs/development/backend/node-express/controllers-services)
+- [Request Validation Standards](/docs/development/backend/api-development/request-validation)
+- [Unit Testing with Jest](/docs/development/backend/testing/unit-testing-node)

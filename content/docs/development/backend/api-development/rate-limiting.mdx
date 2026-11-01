@@ -1,0 +1,166 @@
+---
+title: API Rate Limiting & Traffic Throttling
+description: Distributed rate limiting with Redis sliding logs, IP vs user quotas, tiered endpoint policies, and HTTP 429 semantics.
+---
+
+Rate limiting protects backend systems from brute-force authentication attacks, Denial of Service (DoS) saturation, accidental client request loops, and unfair resource consumption across multi-tenant tiers.
+
+---
+
+## 1. Rate Limiting Algorithms
+
+| Algorithm | Mechanism | Trade-Off | Verdict |
+| :--- | :--- | :--- | :--- |
+| **Fixed Window** | Counts requests inside static minute windows (e.g. 12:00-12:01). | Vulnerable to traffic spikes at window boundaries (2x allowed rate). | Not recommended for high-risk endpoints. |
+| **Token Bucket** | Tokens refill at a steady rate; bursts consume bucket capacity. | Allows controlled bursts, good for API consumers. | Excellent for general API quotas. |
+| **Sliding Window Log** | Tracks timestamps in a Redis sorted set (`ZADD` / `ZREMRANGEBYSCORE`). | 100% accurate sliding window; slightly higher Redis memory. | **Nexium Media Standard for Auth & Payments**. |
+
+---
+
+## 2. Rate Limiting Tiers & Scopes
+
+Different API surfaces enforce differentiated quota rules:
+
+| Route Type | Scope Key | Default Limit | Action on Exceeded |
+| :--- | :--- | :--- | :--- |
+| **Public Unauthenticated** | Client IP (`req.ip`) | 60 requests / minute | Return `429 Too Many Requests` |
+| **Authentication Endpoints** (`/login`, `/register`, `/forgot-password`) | IP + Target Email | 5 attempts / 15 minutes | Return `429` with `Retry-After: 900` |
+| **Authenticated Users** | JWT `userId` | 300 requests / minute | Return `429 Too Many Requests` |
+| **Developer API Keys** | API Key ID | Tier-based (e.g. 1,000 / min) | Return `429` with usage headers |
+
+---
+
+## 3. Node.js Implementation with Redis
+
+Configure `express-rate-limit` using `rate-limit-redis`:
+
+```ts title="src/middleware/rateLimiter.ts"
+import rateLimit from 'express-rate-limit';
+import RedisStore from 'rate-limit-redis';
+import { redisClient } from '../config/redis.js';
+import { AppError } from '../utils/appError.js';
+
+// General API Rate Limiter
+export const standardApiLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 120, // 120 requests per minute
+  standardHeaders: true, // Return X-RateLimit-* and RateLimit-* headers
+  legacyHeaders: false,
+  store: new RedisStore({
+    sendCommand: (...args: string[]) => redisClient.sendCommand(args),
+    prefix: 'rl:std:',
+  }),
+  keyGenerator: (req) => {
+    // Key by authenticated user ID if present; fallback to IP
+    return req.user?.userId ?? req.ip ?? 'unknown';
+  },
+  handler: (_req, res, next, options) => {
+    res.setHeader('Retry-After', Math.ceil(options.windowMs / 1000));
+    next(new AppError('API rate limit exceeded. Please throttle requests.', 429, 'RATE_LIMIT_EXCEEDED'));
+  },
+});
+
+// Sensitive Authentication Limiter
+export const strictAuthLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // 5 attempts per window
+  standardHeaders: true,
+  legacyHeaders: false,
+  store: new RedisStore({
+    sendCommand: (...args: string[]) => redisClient.sendCommand(args),
+    prefix: 'rl:auth:',
+  }),
+  keyGenerator: (req) => `${req.ip}_${req.body.email ?? ''}`,
+  handler: (_req, res, next, options) => {
+    res.setHeader('Retry-After', Math.ceil(options.windowMs / 1000));
+    next(
+      new AppError(
+        'Too many failed login attempts. Account temporarily locked for 15 minutes.',
+        429,
+        'AUTH_LOCKED'
+      )
+    );
+  },
+});
+```
+
+---
+
+## 4. Python / FastAPI Implementation with SlowAPI
+
+In FastAPI, use **SlowAPI** backed by Redis:
+
+```python title="app/middleware/limiter.py"
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from fastapi import Request, Response
+from fastapi.responses import JSONResponse
+from app.config import settings
+
+limiter = Limiter(
+    key_func=get_remote_address,
+    storage_uri=settings.REDIS_URL,
+    default_limits=["120/minute"],
+)
+
+def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded) -> Response:
+    return JSONResponse(
+        status_code=429,
+        headers={"Retry-After": "60"},
+        content={
+            "error": {
+                "code": "RATE_LIMIT_EXCEEDED",
+                "message": f"Rate limit exceeded: {exc.detail}",
+                "details": [],
+            },
+            "meta": {
+                "requestId": getattr(request.state, "request_id", ""),
+            },
+        },
+    )
+```
+
+### Applying Throttling to Route Handlers
+
+```python title="app/routers/auth.py"
+from fastapi import APIRouter, Request
+from app.middleware.limiter import limiter
+
+router = APIRouter(prefix="/auth", tags=["Auth"])
+
+@router.post("/login")
+@limiter.limit("5/15minute")
+async def login(request: Request, payload: LoginSchema):
+    return await auth_service.authenticate(payload)
+```
+
+---
+
+## 5. Mandatory HTTP 429 Response Headers
+
+Whenever a rate limit threshold is triggered, the response must communicate reset expectations:
+
+```http
+HTTP/1.1 429 Too Many Requests
+Content-Type: application/json
+Retry-After: 48
+X-RateLimit-Limit: 120
+X-RateLimit-Remaining: 0
+X-RateLimit-Reset: 1730449248
+
+{
+  "error": {
+    "code": "RATE_LIMIT_EXCEEDED",
+    "message": "Too many requests. Please wait 48 seconds before retrying."
+  }
+}
+```
+
+---
+
+## Related
+
+- [API Response Standards](/docs/development/backend/api-development/response-standards)
+- [API Key Authentication & Scopes](/docs/development/backend/authentication/api-keys)
+- [OWASP Security Top 10 Mitigation](/docs/development/backend/security)

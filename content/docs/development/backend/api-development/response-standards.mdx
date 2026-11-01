@@ -1,0 +1,145 @@
+---
+title: API Response Standards & Envelopes
+description: Uniform JSON response formatting, operational error codes, response helpers, and header protocols across Node.js and FastAPI.
+---
+
+Predictable response structures allow frontend engineers, mobile developers, and third-party consumers to write uniform API clients without custom handling per endpoint.
+
+---
+
+## 1. The Standard Response Envelopes
+
+Every JSON response emitted by Nexium Media backends wraps its payload inside one of three standard envelopes:
+
+### 1. Single Entity / Object Response
+```json
+{
+  "data": {
+    "id": "usr_902f8a12",
+    "email": "priya.sharma@nexiummedia.com",
+    "fullName": "Priya Sharma",
+    "role": "LEAD_ENGINEER"
+  },
+  "meta": {
+    "requestId": "req_8b91a27e-3c22-48f5-93df-f4460d3d5f19",
+    "timestamp": "2026-11-01T08:00:00.000Z"
+  }
+}
+```
+
+### 2. Paginated Collection Response
+```json
+{
+  "data": [
+    { "id": "proj_1", "name": "E-Commerce Gateway" },
+    { "id": "proj_2", "name": "Analytics Dashboard" }
+  ],
+  "meta": {
+    "requestId": "req_8b91a27e-3c22-48f5-93df-f4460d3d5f19",
+    "timestamp": "2026-11-01T08:00:00.000Z",
+    "pagination": {
+      "page": 1,
+      "pageSize": 20,
+      "totalRecords": 86,
+      "totalPages": 5,
+      "hasNextPage": true,
+      "hasPrevPage": false
+    }
+  }
+}
+```
+
+### 3. Error Response
+```json
+{
+  "error": {
+    "code": "ENTITY_NOT_FOUND",
+    "message": "Project with identifier 'proj_999' was not found.",
+    "details": []
+  },
+  "meta": {
+    "requestId": "req_8b91a27e-3c22-48f5-93df-f4460d3d5f19",
+    "timestamp": "2026-11-01T08:00:00.000Z"
+  }
+}
+```
+
+---
+
+## 2. Standardized Error String Constants
+
+Avoid dynamic, arbitrary error codes. Standardize on uppercase, snake_cased strings:
+
+| Error Constant | HTTP Status | Description |
+| :--- | :--- | :--- |
+| `VALIDATION_FAILED` | `422` | Request body or query params failed schema checks. |
+| `UNAUTHORIZED` | `401` | Missing, expired, or invalid authentication credentials. |
+| `FORBIDDEN` | `403` | Valid credentials, but lacks permission for this action. |
+| `ENTITY_NOT_FOUND` | `404` | Requested database entity or URI does not exist. |
+| `CONFLICT` | `409` | Unique constraint violation (e.g. duplicate email). |
+| `RATE_LIMIT_EXCEEDED` | `429` | Client has exceeded quota thresholds. |
+| `INTERNAL_SERVER_ERROR` | `500` | Uncaught server defect or database failure. |
+
+---
+
+## 3. Node.js Response Helpers (`src/utils/response.ts`)
+
+Encapsulate response construction in lightweight utilities:
+
+```ts title="src/utils/response.ts"
+import { Response } from 'express';
+
+export interface PaginationMeta {
+  page: number;
+  pageSize: number;
+  totalRecords: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPrevPage: boolean;
+}
+
+export const sendSuccess = <T>(
+  res: Response,
+  data: T,
+  statusCode = 200,
+  pagination?: PaginationMeta
+): void => {
+  res.status(statusCode).json({
+    data,
+    meta: {
+      requestId: res.req.id ?? '',
+      timestamp: new Date().toISOString(),
+      ...(pagination ? { pagination } : {}),
+    },
+  });
+};
+```
+
+---
+
+## 4. Mandatory HTTP Response Headers
+
+Every API response must include standard telemetry headers:
+
+- **`X-Request-Id`**: The unique UUID assigned to the request lifecycle.
+- **`X-RateLimit-Limit`**: The maximum allowed requests within the time window.
+- **`X-RateLimit-Remaining`**: Number of requests remaining in current window.
+- **`Retry-After`**: Number of seconds to wait before retrying (mandatory on `429 Too Many Requests`).
+
+---
+
+## 5. Null vs. Omitted Fields Convention
+
+<Callout type="tip">
+**Nexium Media Convention**:
+- In **database reads / responses**, explicit `null` indicates that the attribute exists on the model but holds no value: `avatarUrl: null`.
+- In **PATCH request bodies**, omitted keys mean "do not change this field", while `null` means "clear this field's value to empty".
+</Callout>
+
+---
+
+## Related
+
+- [REST Conventions](/docs/development/backend/api-development/rest-conventions)
+- [Pagination Strategies](/docs/development/backend/api-development/pagination)
+- [Rate Limiting Protocols](/docs/development/backend/api-development/rate-limiting)

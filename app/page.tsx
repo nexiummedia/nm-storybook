@@ -1,7 +1,9 @@
 import React from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import {
   Sparkles,
+  Bot,
   ArrowRight,
   Terminal,
   Globe,
@@ -47,6 +49,13 @@ const categories = [
     icon: FileCode2,
     description: 'Lead generation pipelines, Razorpay payment webhooks, and REST API standards.',
     guides: ['API Structure', 'Authentication & JWT', 'CRM Integrations'],
+  },
+  {
+    title: 'AI & Prompt Engineering',
+    href: '/docs/prompt-engineering',
+    icon: Bot,
+    description: 'Agentic coding, performance copywriting, deep research, and cinematic video/image prompting.',
+    guides: ['Coding & Bug Fixing', 'Marketing & CRO', 'Cinematic Video & Image'],
   },
   {
     title: 'Processes & Delivery',
@@ -102,11 +111,18 @@ export default function HomePage() {
       <header className="sticky top-0 z-40 w-full border-b border-fd-border/60 bg-fd-background/85 backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-6">
-            <Link href="/" className="flex items-center gap-2.5 transition-opacity hover:opacity-90">
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#6f00ff] text-white shadow-xs">
-                <Sparkles className="h-4 w-4" />
+            <Link href="/" className="flex items-center transition-opacity hover:opacity-90">
+              <div className="relative flex items-center justify-center overflow-hidden">
+                <Image
+                  src="/Nlogo.png"
+                  alt="Nexium Media"
+                  width={28}
+                  height={28}
+                  className="h-full w-full object-cover"
+                  priority
+                />
               </div>
-              <span className="text-sm font-semibold tracking-tight">Nexium Media Docs</span>
+              <span className="text-sm font-semibold tracking-tight">Docs</span>
             </Link>
 
             <nav className="hidden md:flex items-center gap-5 text-xs font-medium text-fd-muted-foreground">
@@ -118,6 +134,9 @@ export default function HomePage() {
               </Link>
               <Link href="/docs/development" className="transition-colors hover:text-fd-foreground">
                 Development
+              </Link>
+              <Link href="/docs/prompt-engineering" className="transition-colors hover:text-fd-foreground">
+                AI & Prompts
               </Link>
               <Link href="/docs/processes" className="transition-colors hover:text-fd-foreground">
                 Processes
@@ -304,8 +323,14 @@ export default function HomePage() {
       <footer className="border-t border-fd-border/60 py-10">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-6 w-6 items-center justify-center rounded-md bg-[#6f00ff] text-white">
-              <Sparkles className="h-3.5 w-3.5" />
+            <div className="relative flex h-6 w-6 items-center justify-center overflow-hidden rounded-md shadow-xs">
+              <Image
+                src="/Nlogo.jpeg"
+                alt="Nexium Media"
+                width={24}
+                height={24}
+                className="h-full w-full object-cover"
+              />
             </div>
             <span className="text-xs font-medium text-fd-foreground">Nexium Media Private Limited • Dhanbad, Jharkhand</span>
           </div>

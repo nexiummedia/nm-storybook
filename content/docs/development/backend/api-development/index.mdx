@@ -1,0 +1,56 @@
+---
+title: API Development Standards
+description: Enterprise HTTP conventions, schema-first validation, envelope contracts, pagination, and traffic controls at Nexium Media.
+---
+
+APIs are the digital contracts connecting backend persistence with user interfaces, mobile clients, and partner integrations. In an agency environment where multiple teams collaborate across frontend and backend boundaries, strict API standardization eliminates integration ambiguities.
+
+---
+
+## Core Tenets of Nexium Media APIs
+
+1. **Predictability Above All**: If an engineer knows how `/api/v1/users` works, they should intuitively know how `/api/v1/invoices` behaves: identical pagination query parameters, identical error envelopes, and consistent status codes.
+2. **Schema-First Contracts**: Every request and response has an explicit validation schema (Zod in TypeScript, Pydantic in Python). No un-validated JSON payloads ever enter our systems.
+3. **Graceful Degeneration & Strict Rate Limits**: APIs must protect downstream database pools from traffic spikes via Redis-backed rate limiting and efficient cursor pagination.
+
+---
+
+## Section Guides
+
+Dive into our API implementation guides:
+
+<Cards>
+  <Card
+    title="REST Conventions"
+    href="/docs/development/backend/api-development/rest-conventions"
+    description="URL taxonomy, plural nouns, filtering, sorting, sparse fieldsets, and versioning rules."
+  />
+  <Card
+    title="Request Validation"
+    href="/docs/development/backend/api-development/request-validation"
+    description="Boundary validation, sanitization, Zod middleware, Pydantic constraints, and 422 error structures."
+  />
+  <Card
+    title="Response Standards"
+    href="/docs/development/backend/api-development/response-standards"
+    description="Standard data/meta envelopes, operational error codes, response helpers, and header protocols."
+  />
+  <Card
+    title="Pagination Strategies"
+    href="/docs/development/backend/api-development/pagination"
+    description="Offset vs cursor-based pagination, Prisma and SQLAlchemy implementations, and total count performance."
+  />
+  <Card
+    title="Rate Limiting Patterns"
+    href="/docs/development/backend/api-development/rate-limiting"
+    description="Sliding window algorithms with Redis, express-rate-limit, SlowAPI, and 429 Retry-After semantics."
+  />
+</Cards>
+
+---
+
+## Related
+
+- [Backend Architecture Overview](/docs/development/backend/architecture)
+- [RESTful Design Standards](/docs/development/backend/architecture/api-design)
+- [API Security Architecture](/docs/development/backend/security/api-security)

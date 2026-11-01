@@ -1,0 +1,170 @@
+---
+title: API Key Authentication & Management
+description: Machine-to-machine authentication, cryptographically secure key issuance, hashed key persistence, and scoped rate limiting.
+---
+
+API keys authenticate programmatic consumers, third-party webhook dispatchers, and machine-to-machine microservices. They identify the calling tenant and enforce usage quotas without requiring user login sessions.
+
+---
+
+## 1. Key Structure & Generation Standards
+
+Nexium Media API keys follow a standard format with an environment prefix and a high-entropy secret string:
+
+```text
+nm_live_8f0a2d3c5e7b1a9f0e2d4c6b8a0f2e4d6c8b0a2f
+└──┬──┘  └───────────────────┬───────────────────┘
+ Prefix       32 Bytes Cryptographic Hex Entropy
+```
+
+- **Prefix (`nm_live_` / `nm_test_`)**: Identifies the key type and environment instantly in logs, secret scanners, and error traces.
+- **Entropy**: Minimum 256 bits (32 bytes) of cryptographically secure pseudo-random entropy generated via system randomness (`node:crypto` or Python `secrets`).
+
+```ts title="Generating Keys (Node.js)"
+import crypto from 'node:crypto';
+
+export const generateApiKey = (environment = 'live') => {
+  const secret = crypto.randomBytes(24).toString('hex');
+  const apiKey = `nm_${environment}_${secret}`;
+  // Extract a preview for display (e.g. nm_live_...8f0a)
+  const displayPrefix = apiKey.slice(0, 12);
+  return { apiKey, displayPrefix };
+};
+```
+
+```python title="Generating Keys (Python)"
+import secrets
+
+def generate_api_key(environment: str = "live") -> tuple[str, str]:
+    secret = secrets.token_hex(24)
+    api_key = f"nm_{environment}_{secret}"
+    display_prefix = api_key[:12]
+    return api_key, display_prefix
+```
+
+---
+
+## 2. Storage Security: Never Store Plaintext Keys
+
+<Callout type="error">
+**Critical Security Invariant**: Never store API keys in plaintext in any database! If the database is dumped or read replica compromised, all customer API keys are leaked. Store only a cryptographic one-way hash (SHA-256 with pepper, or bcrypt).
+</Callout>
+
+### Schema Definition
+```sql
+CREATE TABLE api_keys (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,                     -- e.g. "Zapier Integration"
+    display_prefix TEXT NOT NULL,           -- e.g. "nm_live_4a1b"
+    key_hash TEXT NOT NULL UNIQUE,          -- SHA-256 hash of full key
+    scopes TEXT[] NOT NULL DEFAULT '{}',    -- e.g. ['orders:read', 'orders:write']
+    rate_limit_per_min INTEGER DEFAULT 120,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    expires_at TIMESTAMPTZ,
+    last_used_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+---
+
+## 3. Node.js Verification Middleware
+
+Inspect the `X-API-Key` header, compute its SHA-256 hash, and match against the database:
+
+```ts title="src/middleware/apiKey.middleware.ts"
+import { Request, Response, NextFunction } from 'express';
+import crypto from 'node:crypto';
+import { prisma } from '../config/database.js';
+import { AppError } from '../utils/appError.js';
+
+export const requireApiKey = (requiredScope?: string) => {
+  return async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
+    const rawApiKey = req.headers['x-api-key'] as string | undefined;
+
+    if (!rawApiKey || !rawApiKey.startsWith('nm_')) {
+      return next(new AppError('API key missing or malformed', 401, 'API_KEY_REQUIRED'));
+    }
+
+    // 1. Compute SHA-256 hash of presented key
+    const keyHash = crypto.createHash('sha256').update(rawApiKey).digest('hex');
+
+    // 2. Lookup key in database
+    const keyRecord = await prisma.apiKey.findUnique({
+      where: { keyHash },
+      include: { tenant: true },
+    });
+
+    if (!keyRecord || !keyRecord.isActive) {
+      return next(new AppError('Invalid or revoked API key', 401, 'INVALID_API_KEY'));
+    }
+
+    // 3. Verify expiration
+    if (keyRecord.expiresAt && keyRecord.expiresAt < new Date()) {
+      return next(new AppError('API key has expired', 401, 'API_KEY_EXPIRED'));
+    }
+
+    // 4. Verify scope permissions
+    if (requiredScope && !keyRecord.scopes.includes(requiredScope) && !keyRecord.scopes.includes('*')) {
+      return next(new AppError(`Insufficient scope. Required: ${requiredScope}`, 403, 'INSUFFICIENT_SCOPE'));
+    }
+
+    // 5. Update last_used_at asynchronously
+    prisma.apiKey.update({
+      where: { id: keyRecord.id },
+      data: { lastUsedAt: new Date() },
+    }).catch(() => null);
+
+    req.tenant = keyRecord.tenant;
+    next();
+  };
+};
+```
+
+---
+
+## 4. FastAPI Verification Dependency
+
+In FastAPI, use `APIKeyHeader`:
+
+```python title="app/dependencies/api_key.py"
+import hashlib
+from fastapi import Security, HTTPException, status, Depends
+from fastapi.security import APIKeyHeader
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.dependencies.database import get_db
+from app.repositories.api_key_repository import ApiKeyRepository
+
+api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+
+async def verify_api_key(
+    raw_key: str = Security(api_key_header),
+    db: AsyncSession = Depends(get_db),
+):
+    if not raw_key or not raw_key.startswith("nm_"):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing or malformed X-API-Key header",
+        )
+
+    key_hash = hashlib.sha256(raw_key.encode("utf-8")).hexdigest()
+    repo = ApiKeyRepository(db)
+    api_key_record = await repo.get_by_hash(key_hash)
+
+    if not api_key_record or not api_key_record.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or revoked API key",
+        )
+
+    return api_key_record
+```
+
+---
+
+## Related
+
+- [JWT Authentication Implementation](/docs/development/backend/authentication/jwt-auth)
+- [Rate Limiting by API Key](/docs/development/backend/api-development/rate-limiting)
+- [Secrets Management & Encryption](/docs/development/backend/security/secrets-management)

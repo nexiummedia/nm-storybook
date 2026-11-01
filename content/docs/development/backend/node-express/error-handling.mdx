@@ -1,0 +1,159 @@
+---
+title: Express Error Handling Architecture
+description: Operational vs programmer errors, custom AppError classes, Prisma/Zod error transformation, and process-level crash safety.
+---
+
+Robust error handling separates amateur applications from enterprise production services. At Nexium Media, we maintain strict distinctions between expected operational errors and unexpected programmer defects.
+
+---
+
+## 1. Operational Errors vs. Programmer Defects
+
+| Error Type | Definition | Example | Recovery Action |
+| :--- | :--- | :--- | :--- |
+| **Operational Error** | Predictable runtime issues occurring in normal operation. | Invalid password, expired JWT, resource not found, unique constraint violation. | Return 4xx HTTP response with clear error envelope. Keep process running. |
+| **Programmer Defect** | Bugs in code or unforeseen system failures. | Reading property of `undefined`, syntax error, DB connection lost, unhandled type error. | Log structured error with stack trace, return generic 500 error, restart worker cleanly. |
+
+---
+
+## 2. The Custom `AppError` Class
+
+Operational errors are instantiated via our standard `AppError` class:
+
+```ts title="src/utils/appError.ts"
+export class AppError extends Error {
+  public readonly statusCode: number;
+  public readonly errorCode: string;
+  public readonly isOperational: boolean;
+  public readonly details?: unknown;
+
+  constructor(
+    message: string,
+    statusCode = 500,
+    errorCode = 'INTERNAL_ERROR',
+    details?: unknown
+  ) {
+    super(message);
+    this.statusCode = statusCode;
+    this.errorCode = errorCode;
+    this.isOperational = true;
+    this.details = details;
+
+    // Capture clean stack trace omitting constructor
+    Error.captureStackTrace(this, this.constructor);
+  }
+}
+```
+
+---
+
+## 3. Global Error Handling Middleware
+
+The terminal error middleware normalizes errors from all sources (Zod, Prisma, native errors) into our standard error schema:
+
+```ts title="src/middleware/error.middleware.ts"
+import { Request, Response, NextFunction } from 'express';
+import { ZodError } from 'zod';
+import { Prisma } from '@prisma/client';
+import { AppError } from '../utils/appError.js';
+import { config } from '../config/index.js';
+import { logger } from '../utils/logger.js';
+
+export const globalErrorHandler = (
+  err: unknown,
+  req: Request,
+  res: Response,
+  _next: NextFunction
+): void => {
+  let error: AppError;
+
+  // 1. Convert Zod Validation Errors -> 422
+  if (err instanceof ZodError) {
+    const formattedIssues = err.issues.map((issue) => ({
+      field: issue.path.join('.'),
+      message: issue.message,
+      rule: issue.code,
+    }));
+    error = new AppError('Request validation failed', 422, 'VALIDATION_FAILED', formattedIssues);
+  }
+  // 2. Convert Prisma Known Database Errors
+  else if (err instanceof Prisma.PrismaClientKnownRequestError) {
+    switch (err.code) {
+      case 'P2002': { // Unique constraint failed
+        const target = (err.meta?.target as string[])?.join(', ') ?? 'field';
+        error = new AppError(`A record with this ${target} already exists`, 409, 'DUPLICATE_ENTITY');
+        break;
+      }
+      case 'P2025': { // Record not found
+        error = new AppError('The requested record was not found', 404, 'RECORD_NOT_FOUND');
+        break;
+      }
+      default:
+        error = new AppError('Database query execution error', 500, 'DATABASE_ERROR');
+    }
+  }
+  // 3. Operational AppErrors
+  else if (err instanceof AppError) {
+    error = err;
+  }
+  // 4. Programmer / System Errors (500)
+  else {
+    const nativeErr = err instanceof Error ? err : new Error('Unknown error');
+    error = new AppError(nativeErr.message, 500, 'INTERNAL_SERVER_ERROR');
+    (error as { isOperational: boolean }).isOperational = false;
+  }
+
+  // Structured Logging
+  logger.error({
+    err: error,
+    requestId: req.id,
+    path: req.originalUrl,
+    method: req.method,
+    statusCode: error.statusCode,
+  }, `[Error] ${error.message}`);
+
+  // Send Sanitized Response Envelope
+  res.status(error.statusCode).json({
+    error: {
+      code: error.errorCode,
+      message: error.isOperational ? error.message : 'An unexpected error occurred. Please contact support.',
+      ...(error.details ? { details: error.details } : {}),
+      ...(config.NODE_ENV === 'development' && !error.isOperational && { stack: error.stack }),
+    },
+    meta: {
+      requestId: req.id ?? '',
+      timestamp: new Date().toISOString(),
+    },
+  });
+};
+```
+
+---
+
+## 4. Process-Level Unhandled Error Listeners
+
+If an unhandled exception slips past Express, prevent the Node.js process from lingering in an indeterminate state:
+
+```ts title="src/index.ts (Process Handlers)"
+process.on('uncaughtException', (err: Error) => {
+  logger.fatal({ err }, 'Uncaught Exception detected! Initiating graceful restart.');
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason: unknown) => {
+  logger.fatal({ reason }, 'Unhandled Promise Rejection detected! Initiating graceful restart.');
+  process.exit(1);
+});
+```
+
+<Callout type="error">
+Never keep a Node.js process running after an `uncaughtException`. Once an unexpected exception occurs, the process memory state may be corrupted, leading to deadlocks, memory leaks, and cascading socket failures. Allow container orchestrators (Docker / Kubernetes) to restart fresh workers.
+</Callout>
+
+---
+
+## Related
+
+- [Express Middleware Pipeline](/docs/development/backend/node-express/middleware)
+- [Request Validation with Zod](/docs/development/backend/api-development/request-validation)
+- [Standard Response Formats](/docs/development/backend/api-development/response-standards)

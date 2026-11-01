@@ -1,0 +1,9 @@
+{
+  "title": "Getting Started",
+  "pages": [
+    "index",
+    "node-setup",
+    "python-setup",
+    "project-scaffold"
+  ]
+}

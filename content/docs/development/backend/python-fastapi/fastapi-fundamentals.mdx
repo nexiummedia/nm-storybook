@@ -1,0 +1,202 @@
+---
+title: FastAPI Fundamentals & Lifespan Architecture
+description: Core application lifecycle with async lifespan handlers, path operations, request validation, background tasks, and CRUD endpoints.
+---
+
+FastAPI is an ASGI framework built on top of Starlette and Pydantic. It provides automatic interactive documentation (Swagger UI and ReDoc), schema validation, and asynchronous concurrency out of the box.
+
+---
+
+## 1. Application Creation & Modern `lifespan` Handlers
+
+Legacy FastAPI startup and shutdown events (`@app.on_event`) are deprecated. Nexium Media uses the async **`lifespan` context manager** to cleanly initialize and tear down external connections (such as database pools and Redis caches):
+
+```python title="app/main.py"
+from contextlib import asynccontextmanager
+from typing import AsyncGenerator
+from fastapi import FastAPI
+from app.config import settings
+from app.database import engine
+from app.routers import api_router
+from app.utils.logger import logger
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    # --- STARTUP LOGIC ---
+    logger.info("Initializing database connection pool...", service=settings.APP_NAME)
+    # Test DB engine connectivity
+    async with engine.begin() as conn:
+        logger.info("Database engine verified.")
+
+    yield # Application serves requests here
+
+    # --- SHUTDOWN LOGIC ---
+    logger.info("Disposing database connection pool...")
+    await engine.dispose()
+    logger.info("Cleanup complete. Shutdown graceful.")
+
+app = FastAPI(
+    title=settings.APP_NAME,
+    version="1.0.0",
+    docs_url="/docs" if settings.ENVIRONMENT != "production" else None,
+    redoc_url=None,
+    lifespan=lifespan,
+)
+
+# Mount central API Router
+app.include_router(api_router, prefix="/api/v1")
+```
+
+<Callout type="warning">
+Notice `docs_url` is disabled in production environments (`settings.ENVIRONMENT == "production"`). Never expose interactive Swagger UI documentation publicly on production servers unless an explicit public developer portal is specified.
+</Callout>
+
+---
+
+## 2. Path Operations & HTTP Verbs
+
+FastAPI uses decorators to declare endpoints, HTTP verbs, status codes, response schemas, and OpenAPI tags:
+
+```python
+@router.get("/users/{user_id}", response_model=UserResponse, status_code=200, tags=["Users"])
+async def get_user(user_id: str) -> UserResponse: ...
+
+@router.post("/users", response_model=UserResponse, status_code=201, tags=["Users"])
+async def create_user(payload: UserCreate) -> UserResponse: ...
+
+@router.patch("/users/{user_id}", response_model=UserResponse, status_code=200, tags=["Users"])
+async def update_user(user_id: str, payload: UserUpdate) -> UserResponse: ...
+
+@router.delete("/users/{user_id}", status_code=204, tags=["Users"])
+async def delete_user(user_id: str) -> None: ...
+```
+
+---
+
+## 3. Path, Query, and Body Parameters
+
+FastAPI automatically parses and validates arguments based on their Python type annotations:
+
+```python
+from uuid import UUID
+from fastapi import APIRouter, Path, Query
+from app.schemas.user import UserFilterSchema
+
+router = APIRouter()
+
+@router.get("/items/{item_id}")
+async def read_item(
+    item_id: UUID = Path(..., description="The unique UUID of the item"),
+    limit: int = Query(default=20, ge=1, le=100, description="Items per page"),
+    offset: int = Query(default=0, ge=0),
+    is_active: bool = Query(default=True),
+):
+    return {"item_id": item_id, "limit": limit, "offset": offset, "is_active": is_active}
+```
+
+---
+
+## 4. Non-Blocking `BackgroundTasks`
+
+For lightweight background operations that should not delay the HTTP response (e.g. sending a welcome email, recording audit events), use Starlette's `BackgroundTasks`:
+
+```python
+from fastapi import APIRouter, BackgroundTasks, status
+from app.schemas.user import UserCreate, UserResponse
+from app.services.email_service import send_welcome_email
+
+router = APIRouter()
+
+@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+async def register_account(
+    payload: UserCreate,
+    background_tasks: BackgroundTasks,
+) -> UserResponse:
+    # 1. Create user synchronously within the request transaction
+    user = await user_service.create_user(payload)
+
+    # 2. Schedule non-blocking background job (executed after response is dispatched)
+    background_tasks.add_task(send_welcome_email, user.email, user.full_name)
+
+    return user
+```
+
+<Callout type="note">
+`BackgroundTasks` runs inside the same process worker. For heavy, compute-intensive, or distributed tasks (e.g., video transcoding, report PDF generation), dispatch to a dedicated distributed task queue such as **Celery** or **ARQ** backed by Redis.
+</Callout>
+
+---
+
+## 5. Complete CRUD Router Example
+
+Here is a full production router demonstrating domain models, status codes, dependency injection, and Pydantic schemas:
+
+```python title="app/routers/users.py"
+from typing import List
+from uuid import UUID
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.dependencies.database import get_db
+from app.dependencies.auth import get_current_user
+from app.schemas.user import UserCreate, UserUpdate, UserResponse
+from app.services.user_service import UserService
+
+router = APIRouter(prefix="/users", tags=["Users"])
+
+@router.get("/", response_model=List[UserResponse])
+async def list_users(
+    skip: int = 0,
+    limit: int = 50,
+    db: AsyncSession = Depends(get_db),
+    _current_user = Depends(get_current_user),
+) -> List[UserResponse]:
+    service = UserService(db)
+    return await service.get_users(skip=skip, limit=limit)
+
+@router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+async def create_user(
+    payload: UserCreate,
+    db: AsyncSession = Depends(get_db),
+) -> UserResponse:
+    service = UserService(db)
+    return await service.create_user(payload)
+
+@router.get("/{user_id}", response_model=UserResponse)
+async def get_user(
+    user_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    _current_user = Depends(get_current_user),
+) -> UserResponse:
+    service = UserService(db)
+    user = await service.get_user_by_id(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
+
+@router.patch("/{user_id}", response_model=UserResponse)
+async def update_user(
+    user_id: UUID,
+    payload: UserUpdate,
+    db: AsyncSession = Depends(get_db),
+    _current_user = Depends(get_current_user),
+) -> UserResponse:
+    service = UserService(db)
+    return await service.update_user(user_id, payload)
+
+@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_user(
+    user_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    _current_user = Depends(get_current_user),
+) -> None:
+    service = UserService(db)
+    await service.delete_user(user_id)
+```
+
+---
+
+## Related
+
+- [Routing & Endpoints](/docs/development/backend/python-fastapi/routing-and-endpoints)
+- [Pydantic v2 Models & Schemas](/docs/development/backend/python-fastapi/pydantic-models)
+- [Dependency Injection Pattern](/docs/development/backend/python-fastapi/dependency-injection)

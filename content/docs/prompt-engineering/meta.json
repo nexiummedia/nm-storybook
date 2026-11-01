@@ -1,0 +1,12 @@
+{
+  "title": "Prompt Engineering",
+  "description": "Production prompt engineering handbooks across coding, marketing, research, image, and video generation in the reasoning model era.",
+  "pages": [
+    "index",
+    "coding-and-debugging",
+    "marketing-and-cro",
+    "research-and-synthesis",
+    "image-generation",
+    "video-generation"
+  ]
+}

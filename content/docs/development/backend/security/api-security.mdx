@@ -1,0 +1,181 @@
+---
+title: API Security Standards
+description: Production security controls, OWASP API Top 10 defenses, CORS policies, security headers, and brute-force protections for Express and FastAPI.
+---
+
+# API Security Standards
+
+Security is not an afterthought or an isolated audit task; it is an active engineering standard baked into every pull request, router definition, and deployment manifest at Nexium Media.
+
+Our API infrastructure adheres strictly to the **OWASP API Security Top 10** vulnerabilities and standardizes defenses across both our Node.js and Python services.
+
+---
+
+## OWASP API Security Top 10 Matrix
+
+| Vulnerability | Threat Description | Nexium Media Standard Defense |
+| :--- | :--- | :--- |
+| **API1: BOLA** (Broken Object Level Auth) | Users accessing records owned by others by tampering with IDs. | Always verify tenant/user ownership in Service/Repository layer (`WHERE id = :id AND tenant_id = :tenant_id`). |
+| **API2: Broken Authentication** | Credential stuffing, weak tokens, lack of rotation. | Enforce short-lived JWTs (15 min), bcrypt/argon2 hashing, refresh token rotation, and rate-limiting on `/auth`. |
+| **API3: Broken Object Property Level Auth** | Mass assignment exposing internal attributes (e.g. `is_admin: true`). | Strict DTOs/Schemas: Zod `.strict()` and Pydantic schemas that omit private/admin fields on input. |
+| **API4: Unrestricted Resource Consumption** | DoS via unbounded queries, memory starvation, or payload spam. | Global rate limiting via Redis, strict payload body size limits (10MB default), and bounded pagination limits (max 100). |
+| **API5: BFLA** (Broken Function Level Auth) | Regular users calling administrative or privileged endpoints. | Declarative RBAC middleware on all non-public routes checking explicit permissions. |
+| **API6: Unrestricted Access to Sensitive Business Flows**| Scraping or automated purchasing via bots. | CAPTCHA verification, device fingerprinting, and sliding-window rate limiting. |
+| **API7: Server-Side Request Forgery (SSRF)** | Fetching internal loopback IPs (`127.0.0.1`, AWS metadata `169.254.169.254`). | Strict URL protocol/domain whitelisting; reject private IP ranges via DNS resolving checks before fetching. |
+| **API8: Security Misconfiguration** | Verbose error stack traces, unhardened HTTP headers, default CORS. | Helmet/Starlette security headers, customized error serialization, and locked-down origin matching. |
+| **API9: Improper Inventory Management** | Zombie or shadow API versions (`/v1` unpatched while `/v2` active). | Strict API deprecation schedules, API gateway path whitelisting, and automated route inventory audits. |
+| **API10: Unsafe Consumption of APIs** | Blindly trusting responses from external third-party webhooks/APIs. | Validate external payloads against Zod/Pydantic schemas; verify HMAC signatures on incoming webhooks. |
+
+---
+
+## 1. HTTP Security Headers
+
+Every service must set standard enterprise HTTP response headers to defend against clickjacking, MIME-type sniffing, cross-site scripting (XSS), and unencrypted transport.
+
+### Express Implementation (Helmet)
+
+```ts title="src/middleware/security.ts"
+import helmet from 'helmet';
+import { Express } from 'express';
+
+export const configureSecurityHeaders = (app: Express) => {
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          scriptSrc: ["'self'"],
+          styleSrc: ["'self'", "'unsafe-inline'"],
+          imgSrc: ["'self'", 'data:', 'https://images.unsplash.com', 'https://*.amazonaws.com'],
+          connectSrc: ["'self'", 'https://api.razorpay.com'],
+          frameAncestors: ["'none'"], // Prevent clickjacking
+        },
+      },
+      crossOriginEmbedderPolicy: false,
+      hsts: {
+        maxAge: 31536000, // 1 year
+        includeSubDomains: true,
+        preload: true,
+      },
+      frameguard: { action: 'deny' },
+      noSniff: true,
+      xssFilter: true,
+    })
+  );
+};
+```
+
+### FastAPI Implementation
+
+```python title="app/middleware/security.py"
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from starlette.responses import Response
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next) -> Response:
+        response = await call_next(request)
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+        return response
+```
+
+---
+
+## 2. Cross-Origin Resource Sharing (CORS)
+
+<Callout type="warning">
+**Never use `*` for CORS in production.** Permissive wildcard origins allow malicious websites running in an authenticated user's browser to read cross-origin responses when credentials (cookies) are enabled.
+</Callout>
+
+### Node.js / Express CORS Policy
+
+```ts title="src/middleware/cors.ts"
+import cors from 'cors';
+
+const allowedOrigins = process.env.ALLOWED_ORIGINS 
+  ? process.env.ALLOWED_ORIGINS.split(',') 
+  : ['https://app.nexiummedia.com', 'https://admin.nexiummedia.com'];
+
+export const corsMiddleware = cors({
+  origin: (origin, callback) => {
+    // Allow non-browser requests (Postman, server-to-server curl)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error(`CORS policy rejection: Origin ${origin} not permitted.`));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id', 'X-Api-Key'],
+  maxAge: 86400, // Cache preflight checks for 24 hours
+});
+```
+
+### FastAPI CORS Configuration
+
+```python title="app/main.py"
+from fastapi.middleware.cors import CORSMiddleware
+from app.core.config import settings
+
+origins = [
+    "https://app.nexiummedia.com",
+    "https://admin.nexiummedia.com",
+]
+
+if settings.ENVIRONMENT == "development":
+    origins.append("http://localhost:3000")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "X-Request-Id", "X-Api-Key"],
+    max_age=86400,
+)
+```
+
+---
+
+## 3. Brute Force & Credential Stuffing Defenses
+
+Authentication and password reset endpoints represent high-value attack vectors. They require targeted rate limiting independent of standard API consumption limits.
+
+1. **Strict Endpoint Throttling**: Limit login attempts to a maximum of 5 requests per 15-minute window per IP or email account.
+2. **Account Lockout / Backoff**: Following 5 consecutive failed attempts, enforce a 15-minute cool-off period and send a security alert notification to the user's verified email.
+3. **Constant-Time Verification**: Use `crypto.timingSafeEqual` or `hmac.compare_digest` when verifying signatures and hashes to mitigate timing side-channel attacks.
+4. **Information Leakage Prevention**: Never return `"User with this email not found"`. Always return generic feedback: `"Invalid email or password combination"` on authentication failures.
+
+---
+
+## 4. Automated Dependency & Vulnerability Auditing
+
+Vulnerabilities within third-party packages must be detected and mitigated before reaching production:
+
+```bash
+# In Node.js projects (enforced in CI)
+npm audit --audit-level=high
+
+# In Python projects (enforced in CI)
+pip-audit
+```
+
+All repositories maintain automated **Dependabot** and **Snyk** scans that immediately open pull requests for critical and high CVE patches.
+
+---
+
+## Related
+
+- [Secrets Management Guidelines](/docs/development/backend/security/secrets-management)
+- [Input Validation Standards](/docs/development/backend/security/input-validation)
+- [Rate Limiting Mechanics](/docs/development/backend/api-development/rate-limiting)
+- [Role-Based Access Control (RBAC)](/docs/development/backend/authentication/rbac)
+

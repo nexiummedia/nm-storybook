@@ -1,0 +1,168 @@
+---
+title: FastAPI Dependency Injection System
+description: Architecture of Depends(), async database session lifecycles, JWT authentication extractors, dependency chains, and test overrides.
+---
+
+FastAPI features one of the most elegant dependency injection (DI) systems in modern web frameworks. Through `Depends()`, you can inject database connections, authenticate credentials, enforce permissions, and compose reusable logic with zero global state.
+
+---
+
+## 1. How `Depends()` Works
+
+When FastAPI processes an endpoint, it evaluates the function's parameter signatures. If an argument uses `Depends(callable)`, FastAPI:
+1. Calls the provider function (resolving any dependencies it requires first).
+2. Passes the returned value into your route handler.
+3. Caches the result per request by default (`use_cache=True`) so multiple dependencies sharing a sub-dependency only execute it once.
+4. Executes teardown code if the dependency is a Python generator with `yield`.
+
+---
+
+## 2. Database Session Lifecycle (`get_db`)
+
+Every request requiring database interaction must obtain its `AsyncSession` through an async generator dependency with deterministic cleanup:
+
+```python title="app/dependencies/database.py"
+from typing import AsyncGenerator
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.database import AsyncSessionLocal
+from app.utils.logger import logger
+
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session
+            await session.commit()
+        except Exception as exc:
+            await session.rollback()
+            logger.error("Database transaction rolled back due to error", exc_info=exc)
+            raise
+        finally:
+            await session.close()
+```
+
+<Callout type="tip">
+Wrapping the session inside `async with AsyncSessionLocal()` and calling `session.commit()` on successful yield guarantees that transactions are either safely committed or automatically rolled back on any unhandled error.
+</Callout>
+
+---
+
+## 3. Current User & Security Dependency Chain
+
+Dependencies can form hierarchical chains where one dependency consumes another. Below, `get_current_user` consumes the `oauth2_scheme` token extractor and the `get_db` session:
+
+```python title="app/dependencies/auth.py"
+from typing import List
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
+from jose import jwt, JWTError
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.config import settings
+from app.dependencies.database import get_db
+from app.models.user import UserModel
+from app.repositories.user_repository import SqlAlchemyUserRepository
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/token")
+
+async def get_current_user(
+    token: str = Depends(oauth2_scheme),
+    db: AsyncSession = Depends(get_db),
+) -> UserModel:
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        user_id: str = payload.get("sub")
+        if user_id is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+
+    repo = SqlAlchemyUserRepository(db)
+    user = await repo.get_by_id(user_id)
+    if user is None or not user.is_active:
+        raise credentials_exception
+
+    return user
+
+def require_role(allowed_roles: List[str]):
+    """Higher-order dependency for RBAC verification."""
+    async def role_checker(current_user: UserModel = Depends(get_current_user)) -> UserModel:
+        if current_user.role not in allowed_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You lack required permissions for this action",
+            )
+        return current_user
+    return role_checker
+```
+
+---
+
+## 4. Auth-Protected Endpoint Implementation
+
+Notice how clean and readable the endpoint remains:
+
+```python title="app/routers/dashboard.py"
+from fastapi import APIRouter, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.dependencies.database import get_db
+from app.dependencies.auth import get_current_user, require_role
+from app.models.user import UserModel
+from app.schemas.dashboard import MetricsResponse
+
+router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
+
+@router.get("/overview", response_model=MetricsResponse)
+async def get_dashboard_overview(
+    db: AsyncSession = Depends(get_db),
+    current_user: UserModel = Depends(require_role(["ADMIN", "MANAGER"])),
+) -> MetricsResponse:
+    # current_user is guaranteed to be an active ADMIN or MANAGER
+    # db session is open and ready for queries
+    return await compute_metrics(db, current_user.tenant_id)
+```
+
+---
+
+## 5. Dependency Overrides in Tests
+
+In automated integration tests, you can effortlessly swap out real database sessions or authentication providers without complex mocking libraries:
+
+```python title="tests/conftest.py"
+import pytest
+from httpx import AsyncClient, ASGITransport
+from app.main import app
+from app.dependencies.database import get_db
+from app.dependencies.auth import get_current_user
+from app.models.user import UserModel
+
+@pytest.fixture
+async def authenticated_client(test_db_session):
+    mock_user = UserModel(
+        id="usr_test123",
+        email="test@nexiummedia.com",
+        role="ADMIN",
+        is_active=True,
+    )
+
+    # Override dependencies for test duration
+    app.dependency_overrides[get_db] = lambda: test_db_session
+    app.dependency_overrides[get_current_user] = lambda: mock_user
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        yield client
+
+    # Clean up overrides after test completes
+    app.dependency_overrides.clear()
+```
+
+---
+
+## Related
+
+- [JWT Authentication Implementation](/docs/development/backend/authentication/jwt-auth)
+- [Role-Based Access Control (RBAC)](/docs/development/backend/authentication/rbac)
+- [Integration Testing with HTTPX](/docs/development/backend/testing/integration-testing)

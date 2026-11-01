@@ -1,0 +1,9 @@
+{
+  "title": "Security Engineering",
+  "pages": [
+    "index",
+    "input-validation",
+    "secrets-management",
+    "api-security"
+  ]
+}

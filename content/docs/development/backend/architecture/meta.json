@@ -1,0 +1,9 @@
+{
+  "title": "Architecture",
+  "pages": [
+    "index",
+    "project-structure",
+    "layered-architecture",
+    "api-design"
+  ]
+}

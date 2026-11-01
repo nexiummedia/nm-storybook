@@ -1,20 +1,140 @@
 ---
-title: Backend Overview
-description: Overview of backend architecture, database schemas, and microservice communications at Nexium Media.
+title: Backend Engineering Handbook
+description: Production-grade architectural standards, conventions, and operational patterns for Node.js (Express) and Python (FastAPI) services at Nexium Media.
 ---
 
-# Backend Overview
+Welcome to the **Nexium Media Backend Engineering Handbook**. As a distributed agency delivering mission-critical applications, enterprise SaaS platforms, and high-throughput microservices across 100+ software engineers, engineering consistency and architectural rigor are paramount.
 
-The Nexium Media backend architecture powers client websites, lead capture pipelines, payment gateways, and analytics dashboards.
+Our backend ecosystem standardizes on two primary platforms:
+1. **Node.js with Express & TypeScript**: High-concurrency I/O workloads, real-time collaboration engines, web-tier BFFs (Backend-for-Frontend), and TypeScript-unified full-stack projects.
+2. **Python 3.12+ with FastAPI**: High-performance asynchronous microservices, data-intensive pipelines, machine learning model serving, and strictly validated schema-driven APIs.
 
-## Architecture Characteristics
+---
 
-- **Serverless & Edge Routes**: API handlers deployed to edge regions for single-digit millisecond response times.
-- **Transactional Data**: PostgreSQL with Prisma ORM for relational schemas (leads, clients, billing).
-- **Payment Processing**: Direct integration with Razorpay for Indian domestic transactions and Stripe for international accounts.
-- **Reliable Webhooks**: Automated idempotent handling for lead notifications and payment status updates.
+## Core Engineering Philosophy
 
-## Subsections
+Every backend service engineered at Nexium Media must adhere to five non-negotiable principles:
 
-- **[API Structure](/docs/development/backend/api-structure)**: RESTful endpoints, error envelopes, and rate limits.
-- **[Authentication](/docs/development/backend/authentication)**: Bearer tokens, API keys, and RBAC authorization policies.
+1. **Separation of Concerns**: We enforce strict layered architecture (`Router -> Controller -> Service -> Repository`). Business logic never handles HTTP contexts, and transport layers never query data stores directly.
+2. **Input Validation at the Boundary**: Never trust client or third-party input. Every incoming payload, query parameter, and path variable is parsed and strictly validated before touching core services (using **Zod** in Node.js and **Pydantic v2** in Python).
+3. **Fail Fast & Explicitly**: Unrecoverable state errors must crash early rather than degrade silently. Errors are typed, domain-specific, and normalized into consistent error envelopes without leaking stack traces or internal topology.
+4. **Idempotency by Design**: Mutating operations (payment processing, order placement, webhook ingestion) must implement idempotency keys and state checks to prevent duplicate side effects during retries.
+5. **Pervasive Observability**: Every request is assigned a unique `X-Request-Id` at the edge, passed through internal service boundaries, and injected into structured JSON logs, metrics, and distributed traces.
+
+---
+
+## Technology Matrix: Express vs FastAPI
+
+Nexium Media utilizes both runtimes deliberately based on domain requirements, team topology, and performance profiles.
+
+| Criterion | Node.js + Express (TypeScript) | Python + FastAPI |
+| :--- | :--- | :--- |
+| **Primary Workloads** | API Gateways, BFF layers, Real-time WebSockets, CRUD SaaS | High-throughput APIs, Async batch processors, ML inference |
+| **Language Runtime** | Node.js LTS (v20/v22) + TypeScript 5.x | Python 3.12+ (CPython with `uvloop`) |
+| **Type System** | Static compilation via TypeScript + Zod at runtime | Type hints (PEP 484) + Pydantic v2 (Rust-core parsing) |
+| **Data Access / ORM** | Prisma ORM (Type-safe queries & migrations) | SQLAlchemy 2.0 (Async session + Core) + Alembic |
+| **Concurrency Model** | Event-driven single-threaded event loop (libuv) | Asyncio event loop with non-blocking coroutines |
+| **API Documentation** | Manual or tsoa / Swagger annotations | Native automatic OpenAPI & Swagger UI at `/docs` |
+| **Validation Mechanism**| Zod schemas middleware | Pydantic BaseModel schemas native to endpoint signatures |
+| **Test Harness** | Jest / Vitest + Supertest | Pytest + HTTPX (`AsyncClient`) |
+| **Key Strengths** | Unified TypeScript codebase with React/Next.js frontend | Unrivaled data processing, native async, instant docs |
+
+<Callout type="tip">
+**Choosing a Stack**: For applications heavily dependent on shared TypeScript models with our Next.js web applications, choose **Node.js/Express**. For projects involving complex data manipulation, algorithmic processing, scientific computing, or AI/ML integrations, standardise on **Python/FastAPI**.
+</Callout>
+
+---
+
+## The Backend Development Lifecycle
+
+Every backend service at Nexium Media follows a structured seven-stage lifecycle from inception to retirement:
+
+```mermaid
+flowchart LR
+    A["1. Requirements & Spec"] --> B["2. Architectural Design"]
+    B --> C["3. Implementation"]
+    C --> D["4. Automated Testing"]
+    D --> E["5. Peer Review (PR)"]
+    E --> F["6. CI/CD & Deploy"]
+    F --> G["7. Monitor & Observe"]
+```
+
+1. **Requirements & API Specification**: Formalize business requirements into an OpenAPI 3.1 contract or schema definitions before writing business logic.
+2. **Architectural Design**: Define entity-relationship diagrams (ERDs), select relational vs document storage, design boundary contracts, and map third-party integrations.
+3. **Implementation**: Build along the layered architectural boundaries with strict linting (`eslint`, `ruff`), strong typing (`tsc`, `mypy`), and environment config validation.
+4. **Automated Testing**: Achieve minimum 80% branch coverage on service business logic via unit tests, and validate critical paths via integration tests with containerized databases.
+5. **Peer Review**: Require two senior engineer approvals verifying security policies, query efficiency (avoiding N+1 queries), and error handling resilience.
+6. **CI/CD & Deployment**: Immutable multi-stage Docker images built, scanned for vulnerabilities (`Trivy`), and deployed through automated GitHub Actions pipelines.
+7. **Monitoring & Telemetry**: Continuous validation via health probes, structured log aggregation, centralized error tracking (Sentry), and p99 latency metrics.
+
+---
+
+## Handbook Structure
+
+Explore the specialized modules comprising our backend engineering standards:
+
+<Cards>
+  <Card
+    title="Getting Started"
+    href="/docs/development/backend/getting-started"
+    description="Development environment setup, Node.js and Python toolchains, and project initialization."
+  />
+  <Card
+    title="Architecture"
+    href="/docs/development/backend/architecture"
+    description="Layered architecture (Router-Service-Repository), folder layouts, and REST API design."
+  />
+  <Card
+    title="Node.js & Express"
+    href="/docs/development/backend/node-express"
+    description="Express.js architecture, TypeScript integration, middleware composition, and error pipelines."
+  />
+  <Card
+    title="Python & FastAPI"
+    href="/docs/development/backend/python-fastapi"
+    description="FastAPI async mechanics, Pydantic v2 data models, dependency injection, and endpoint routing."
+  />
+  <Card
+    title="Database & Persistence"
+    href="/docs/development/backend/database"
+    description="PostgreSQL, MongoDB, Prisma ORM, SQLAlchemy 2.0, migrations, and query tuning."
+  />
+  <Card
+    title="Authentication & Authorization"
+    href="/docs/development/backend/authentication"
+    description="JWT access/refresh tokens, OAuth2 flows, API keys, and Role-Based Access Control (RBAC)."
+  />
+  <Card
+    title="API Development Standards"
+    href="/docs/development/backend/api-development"
+    description="REST conventions, request validation, standard response envelopes, pagination, and rate limiting."
+  />
+  <Card
+    title="Third-Party Integrations"
+    href="/docs/development/backend/integrations"
+    description="Payment gateways (Razorpay, Stripe), transactional email, AWS S3 storage, and webhook systems."
+  />
+  <Card
+    title="Testing & Quality Assurance"
+    href="/docs/development/backend/testing"
+    description="Unit testing with Jest and Pytest, integration testing with Supertest and HTTPX, and test fixtures."
+  />
+  <Card
+    title="Security Engineering"
+    href="/docs/development/backend/security"
+    description="OWASP API Top 10 mitigation, input sanitization, secrets management, CORS, and security headers."
+  />
+  <Card
+    title="Deployment & DevOps"
+    href="/docs/development/backend/deployment"
+    description="Multi-stage Docker builds, environment configuration, health probes, and GitHub Actions CI/CD."
+  />
+</Cards>
+
+---
+
+## Related
+
+- [Frontend Engineering Handbook](/docs/development/frontend)
+- [GitHub Workflow & Branching Conventions](/docs/development/github)
+- [Engineering Processes & Deployments](/docs/processes)

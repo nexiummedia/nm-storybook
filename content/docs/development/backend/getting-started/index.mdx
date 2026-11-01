@@ -1,0 +1,128 @@
+---
+title: Getting Started with Backend Development
+description: Prerequisites, rapid bootstrapping, and universal CLI workflows for Node.js and Python backend microservices at Nexium Media.
+---
+
+Welcome to the backend engineering onboarding track. Whether you are building an event-driven API gateway in Node.js or a high-throughput async processing pipeline in Python, our tooling standards ensure frictionless local development, identical linting invariants, and repeatable builds across teams.
+
+This guide provides a rapid reference to system prerequisites, side-by-side quickstart workflows, and standardized CLI commands.
+
+---
+
+## System Prerequisites
+
+Before initializing any backend service, verify that your local workstation meets our baseline runtime specifications:
+
+| Requirement | Minimum Supported Version | Recommended Tool / Manager |
+| :--- | :--- | :--- |
+| **Operating System** | macOS 14+, Ubuntu 22.04 LTS+, or Windows 11 (WSL2 recommended) | Host native or WSL2 |
+| **Node.js Runtime** | Node.js 20 LTS or 22 LTS | `nvm` (macOS/Linux) or `nvm-windows` |
+| **Node Package Manager** | npm v10+ or pnpm v9+ | Corepack or npm |
+| **Python Runtime** | Python 3.12+ | `pyenv` / `uv` |
+| **Container Engine** | Docker Engine 24.0+ & Docker Compose v2 | Docker Desktop / OrbStack / Rancher Desktop |
+| **Database Tools** | PostgreSQL 16 client (`psql`), pgAdmin / DBeaver | Docker or local binaries |
+| **Version Control** | Git 2.40+ | Native CLI with SSH signing |
+
+<Callout type="note">
+Windows engineers are strongly advised to run Docker and Python virtual environments inside **WSL2 (Ubuntu 22.04 LTS)** to maintain parity with production Linux kernels and avoid path delimiter complications.
+</Callout>
+
+---
+
+## Side-by-Side Quickstart
+
+Initialize a minimal production-ready service in seconds using the following CLI sequences:
+
+### Node.js + Express (TypeScript)
+
+```bash
+# 1. Initialize project directory and git repository
+mkdir nm-express-service && cd nm-express-service
+git init
+
+# 2. Scaffold package.json
+npm init -y
+
+# 3. Install core dependencies
+npm install express zod helmet cors morgan dotenv
+
+# 4. Install dev dependencies (TypeScript, types, dev runner)
+npm install -D typescript @types/express @types/node @types/cors @types/morgan ts-node-dev eslint prettier
+npx tsc --init
+```
+
+### Python + FastAPI (Python 3.12+)
+
+```bash
+# 1. Initialize project directory and git repository
+mkdir nm-fastapi-service && cd nm-fastapi-service
+git init
+
+# 2. Create and activate virtual environment
+python -m venv .venv
+
+# On macOS/Linux:
+source .venv/bin/activate
+# On Windows PowerShell:
+.venv\Scripts\Activate.ps1
+
+# 3. Upgrade pip and install core dependencies
+pip install --upgrade pip
+pip install "fastapi[standard]" "pydantic[email]" "uvicorn[standard]" python-dotenv sqlalchemy alembic asyncpg
+
+# 4. Install dev dependencies for testing and linting
+pip install pytest pytest-asyncio httpx ruff mypy
+```
+
+---
+
+## Universal Task Commands Matrix
+
+Nexium Media services map standard operational tasks to idiomatic tooling across both language ecosystems:
+
+| Lifecycle Task | Node.js (npm scripts) | Python (venv / CLI) | Target Behavior |
+| :--- | :--- | :--- | :--- |
+| **Run Dev Server** | `npm run dev` | `uvicorn app.main:app --reload --port 8000` | Hot-reloading development server |
+| **Execute Unit Tests** | `npm run test` | `pytest tests/unit` | Fast, isolated test suite |
+| **Execute All Tests** | `npm run test:all` | `pytest` | Unit, integration, and contract tests |
+| **Code Formatting** | `npm run format` | `ruff format .` | Automatic code style formatting |
+| **Code Linting** | `npm run lint` | `ruff check .` | AST-based linting and bug inspection |
+| **Static Type Check** | `npm run type-check` | `mypy .` | Strict compiler/type verification |
+| **Production Build** | `npm run build` | `python -m compileall app/` | Emit artifacts / validate bytecode |
+| **Production Run** | `npm run start` | `uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4` | Clustered production server |
+
+<Callout type="warning">
+Never run `npm run start` or `uvicorn app.main:app` in development without watching flags (`ts-node-dev --respawn` or `--reload`). Conversely, never enable reload flags in staging or production environments as they incur significant memory and process overhead.
+</Callout>
+
+---
+
+## Next Steps
+
+Select a guide below to configure your specialized development environment:
+
+<Cards>
+  <Card
+    title="Node.js & Express Setup"
+    href="/docs/development/backend/getting-started/node-setup"
+    description="Detailed TypeScript configuration, ESLint/Prettier setup, Husky git hooks, and .env conventions."
+  />
+  <Card
+    title="Python & FastAPI Setup"
+    href="/docs/development/backend/getting-started/python-setup"
+    description="pyproject.toml configuration, pyenv version locking, virtualenv automation, Ruff, and Mypy."
+  />
+  <Card
+    title="Project Scaffolding"
+    href="/docs/development/backend/getting-started/project-scaffold"
+    description="Examine production project directory layouts, modular domain structures, and bootstrapping checklists."
+  />
+</Cards>
+
+---
+
+## Related
+
+- [Backend Architecture Overview](/docs/development/backend/architecture)
+- [Express Fundamentals](/docs/development/backend/node-express/express-fundamentals)
+- [FastAPI Fundamentals](/docs/development/backend/python-fastapi/fastapi-fundamentals)
