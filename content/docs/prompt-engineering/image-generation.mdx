@@ -1,0 +1,112 @@
+---
+title: "Image Generation Prompt Engineering"
+description: "Mastering Midjourney v6.1, FLUX.1 Pro, DALL-E 3, cinematic camera optics, volumetric lighting, and technical parameter prompting."
+---
+
+# Image Generation Prompt Engineering
+
+Generative image synthesis has advanced rapidly with the release of **Midjourney v6.1**, **FLUX.1 (Dev / Schnell / Pro)**, and **DALL-E 3**. The obsolete habit of stuffing prompts with comma-separated keyword soup (e.g. `hyperrealistic, 8k resolution, octane render, trending on artstation, masterpiece`) is actively detrimental to modern transformer and flow-matching diffusion models.
+
+Modern image engines are trained on natural language captions and understand **spatial relationships, cinematic lighting physics, lens optics, and typography**.
+
+---
+
+## Model Landscape: Choosing the Right Tool
+
+| Model | Primary Strengths | Ideal Enterprise Use Case | Key Prompting Style |
+| :--- | :--- | :--- | :--- |
+| **FLUX.1 Pro** | Unrivaled anatomical accuracy (hands, skin), photorealistic lighting, flawless embedded typography. | High-converting marketing hero imagery, product mockups, brand typography assets. | Conversational, highly descriptive, natural narrative paragraphs. |
+| **Midjourney v6.1** | Painterly aesthetic beauty, cinematic atmosphere, stylized editorial photography, texture richness. | Conceptual art, moodboards, stylized advertising, abstract branding visuals. | Structured descriptive sentences followed by CLI parameters (`--v 6.1 --ar 16:9 --style raw`). |
+| **DALL-E 3** | Exceptional prompt adherence, complex multi-character logic, native conversational refinement. | Rapid ideation, diagrammatic concepts, complex narrative scenes. | Detailed conversational descriptions; excels when guided by ChatGPT. |
+
+---
+
+## The 5-Part Visual Prompt Architecture
+
+Every high-fidelity image prompt generated at Nexium Media follows a 5-layer physical specification:
+
+```text
+1. Primary Subject & Action: The central entity, pose, wardrobe, expressions, and physical interaction.
+2. Setting & Spatial Environment: Background elements, architectural style, atmospheric weather, depth planes.
+3. Lighting Physics & Mood: Directional sources, color temperature (warm golden hour vs cool tungsten), specular highlights, shadows.
+4. Camera Optics & Medium: Sensor size, focal length, aperture (depth of field), film stock, or digital grading.
+5. Parameter Controls (CLI flags): Aspect ratio, stylization strength, model version, raw mode.
+```
+
+---
+
+## Technical Camera & Lighting Glossary
+
+Instead of vague terms like "high quality", use the physical terminology of professional cinematographers:
+
+### Focal Lengths & Perspectives
+- **`24mm / 28mm Wide Angle`**: Expansive perspective, deep depth of field, dramatic architectural and environmental context.
+- **`35mm Lens`**: Natural documentary and photojournalistic perspective, minimal distortion, classic street photography aesthetic.
+- **`50mm "Nifty Fifty"`**: True human eye perspective, versatile editorial portraits, balanced foreground/background relationship.
+- **`85mm / 105mm Portrait Lens (f/1.4)`**: Shallow depth of field, creamy background blur (bokeh), flattering facial compression with zero perspective distortion.
+- **`100mm Macro`**: Microscopic surface detail, water droplets, mechanical gears, fabric weave, extreme close-up.
+
+### Lighting Styles
+- **`Volumetric Lighting / God Rays`**: Beams of light cutting through haze, mist, or dust particles, creating tangible atmospheric depth.
+- **`Chiaroscuro / Rim Lighting`**: High-contrast illumination inspired by Caravaggio, featuring a strong edge backlight that separates dark subjects from deep backgrounds.
+- **`Golden Hour (3200K)`**: Low-angle, warm, amber directional sunlight casting long soft shadows.
+- **`Diffused Overcast Softbox`**: Shadowless, flattering, even illumination ideal for commercial tech hardware and modern UI presentation.
+
+---
+
+## Production Prompt Recipes
+
+### 1. Enterprise SaaS Product Hero Imagery (FLUX.1 Pro)
+
+FLUX.1 excels at technical textures, accurate reflections, and crisp text rendering:
+
+```text
+Editorial commercial photograph of a sleek, minimalist ceramic coffee mug resting on an anodized dark aluminum workstation desk beside an ultra-thin laptop. The side of the ceramic mug features crisp, embossed white typography that reads "NEXIUM MEDIA". Soft morning sunlight streams through a frosted floor-to-ceiling glass office window, casting subtle geometric shadows across the desk surface. Shallow depth of field with sharp, tactile focus on the ceramic texture and steam rising gently from the coffee. Shot on Hasselblad H6D-100c with an 80mm f/2.2 lens. Clean Scandinavian tech aesthetics, warm muted tones, 4k commercial grade.
+```
+
+---
+
+### 2. High-Impact Editorial Portrait (Midjourney v6.1)
+
+```text
+A candid, environmental portrait of a focused female software architect in her late 30s seated in a server room datacenter at night. Cool blue and amber LED server lights reflect softly on her eyeglasses and face. Intricate skin texture, natural flyaway hair, neutral focused expression. Shot on a 35mm f/1.8 lens, cinematic color grading, moody shadows, authentic documentary style, gritty atmospheric realism --ar 16:9 --v 6.1 --style raw --stylize 180
+```
+
+---
+
+### 3. Isometric 3D Tech Illustration (Midjourney v6.1)
+
+```text
+An isometric 3D architectural render of a cloud computing network infrastructure. Glowing purple and cyan optical fiber data streams connect floating geometric database servers, microchips, and API cubes. Clean frosted glass textures, matte dark slate surfaces, subtle ambient occlusion shadows, soft neon bioluminescent glow. Smooth gradient studio background, modern fintech aesthetic --ar 4:3 --v 6.1 --stylize 250
+```
+
+---
+
+## Midjourney v6.1 Parameter Reference Guide
+
+| Parameter | Function | Recommended Value |
+| :--- | :--- | :--- |
+| **`--ar <ratio>`** | Controls the aspect ratio of the generated canvas. | `--ar 16:9` (Hero/Banner), `--ar 1:1` (Square/Avatar), `--ar 4:5` (Instagram/Social). |
+| **`--v 6.1`** | Invokes Midjourney's latest image generation model. | `--v 6.1` (Always use latest for superior skin, hands, and coherence). |
+| **`--style raw`** | Strips away Midjourney's default hyper-saturated aesthetic bias in favor of authentic photographic fidelity. | Essential for photorealistic, documentary, or commercial product shoots. |
+| **`--stylize <0-1000>`** | Dictates the intensity of Midjourney's artistic flair. Lower values adhere more strictly to the prompt text. | Default is `100`. Use `50–150` for strict realism; `250–500` for stylized visual art. |
+| **`--sref <URL>`** | Style Reference: Transfers the color palette, artistic texture, and mood of an existing reference image. | Ideal for maintaining brand consistency across an entire marketing campaign. |
+| **`--cw <0-100>`** | Character Weight: When using `--cref` (Character Reference), dictates whether to copy face only (`--cw 0`) or entire outfit and body (`--cw 100`). | Use `--cw 0` when generating the same persona across different outfits or contexts. |
+
+---
+
+## Rendering Text Inside Images
+
+To generate text accurately inside images:
+- **Midjourney v6.1**: Enclose the exact words in double quotation marks: `A neon sign that reads "OPEN 24/7"`. Keep text under 4–5 words for maximum fidelity.
+- **FLUX.1**: Describe the placement, medium, and lettering style explicitly: `A vintage cardboard box with the words "DELIVERY EXPRESS" stenciled in bold black industrial sans-serif lettering across the center panel.`
+
+---
+
+## Related Guides
+
+- [Video Generation & Cinematics](/docs/prompt-engineering/video-generation)
+- [Performance Marketing & Ad Copy Prompts](/docs/prompt-engineering/marketing-and-cro)
+- [Master Prompt Engineering Overview](/docs/prompt-engineering)
+- [Frontend Component Design & Tokens](/docs/development/frontend/styling/design-tokens)
+

@@ -1,0 +1,125 @@
+---
+title: "Video Generation Prompt Engineering"
+description: "Directing cinematic AI video with OpenAI Sora, Runway Gen-3 Alpha, Kling 1.5, camera choreography, and multi-model production pipelines."
+---
+
+# Video Generation Prompt Engineering
+
+Generative video represents the cutting edge of multimodal artificial intelligence. Models such as **OpenAI Sora**, **Runway Gen-3 Alpha**, **Kling 1.5**, and **Luma Dream Machine** can generate photorealistic, temporally coherent video clips from text and image prompts.
+
+Unlike static image models, video prompts must account for **time, physical momentum, continuous illumination, and camera choreography**. If you only describe what is in the frame, the model will guess how things move—frequently resulting in morphing artifacts, unnatural physics, and floating appendages.
+
+---
+
+## The Frontier Video Model Ecosystem
+
+| Model | Core Advantage | Ideal Use Case | Prompt Style |
+| :--- | :--- | :--- | :--- |
+| **OpenAI Sora** | Deep physical world simulation, object permanence, multi-shot continuity, complex fluid dynamics. | Cinematic narrative storytelling, complex documentary sequences, long-duration takes. | Rich cinematic paragraphs resembling script stage directions. |
+| **Runway Gen-3 Alpha** | Ultra-responsive camera motion controls, photorealistic human expressions, first-frame image-to-video fidelity. | High-production commercial ads, music video clips, controlled camera movements. | Structured camera action verbs + subject physics + pacing cues. |
+| **Kling 1.5** | Exceptional human physics (eating, running, dancing), long 10-second continuous generations, high prompt compliance. | Character-driven interactions, realistic kinetic movement, complex physics. | Explicit chronological step sequences and motion speed controls. |
+| **Luma Dream Machine** | Fast generation velocity, fluid camera pans, natural transitions. | Rapid concept ideation, surreal transitions, background b-roll. | Direct subject-action-environment sentences. |
+
+---
+
+## The 5-Part Motion Prompt Architecture
+
+To produce cinematic, artifact-free video clips, structure prompts around five sequential director's notes:
+
+```text
+1. Camera Choreography: Exact movement vector (e.g. FPV drone dive, slow tracking shot, dolly in, whip pan).
+2. Subject Kinetic Action: What the subject is physically doing across the duration of the clip.
+3. Spatial Environment & Atmosphere: Foreground, midground, background, weather elements, air particulates.
+4. Lighting & Color Palette: Directional lighting continuity, color grade (e.g. Kodak 5219, teal-and-orange).
+5. Temporal Dynamics & Physics: Wind speed, fluid motion, cloth ripple, dust kicked up, pacing velocity.
+```
+
+---
+
+## The Director's Camera Movement Lexicon
+
+AI video models respond strongly to cinematic camera terminology. Always specify the camera movement upfront:
+
+### Dynamic Camera Motions
+- **`Slow Tracking Shot / Trucking Shot`**: Camera travels parallel to the moving subject, maintaining consistent distance and framing.
+- **`Dolly In / Push-In`**: Camera physically glides forward toward the subject, heightening intimacy, tension, or focus.
+- **`Dolly Zoom / Vertigo Effect`**: Camera moves forward while optical zoom pulls back, warping background perspective while keeping subject scale constant.
+- **`Orbital Arc / 360 Pan`**: Camera circles smoothly around the central subject, showcasing three-dimensional volume and lighting interaction.
+- **`FPV Drone Dive`**: Fast, exhilarating descent from high altitude through tight physical spaces, pulling up smoothly near ground level.
+- **`Crane / Jib Shot`**: Sweeping vertical elevation starting from a low subject close-up and rising to reveal a grand landscape panorama.
+
+---
+
+## The Multi-Model Production Pipeline (The Industry Standard)
+
+<Callout type="tip">
+**Why Pure Text-to-Video Fails in Commercial Work**: Pure text-to-video introduces character face drifting, inconsistent wardrobe, and random background styles across takes. 
+Enterprise teams **never** generate final video purely from text.
+</Callout>
+
+To achieve complete commercial control, follow the **Two-Stage Multi-Model Pipeline**:
+
+```mermaid
+flowchart LR
+    A[Step 1: Concept & Composition] -->|Generate Master Keyframe| B[FLUX.1 Pro / Midjourney v6.1]
+    B -->|Export Flawless 16:9 Image| C[Step 2: Motion Animation]
+    C -->|Upload as 'First Frame'| D[Runway Gen-3 Alpha / Kling 1.5]
+    D -->|Apply Motion-Only Prompt| E[Final Photorealistic 4K Video Clip]
+```
+
+### Stage 1: Lock the Keyframe
+Generate your master frame using **FLUX.1 Pro** or **Midjourney v6.1** until character anatomy, wardrobe, branding, and lighting are 100% locked.
+
+### Stage 2: Prompt for Camera Motion Only
+Upload the generated image as the **First Frame** in Runway Gen-3 Alpha, and provide a motion prompt that directs *only* the movement:
+
+```text
+[First Frame Image Uploaded]
+Camera performs a slow, cinematic push-in. The subject turns her head smoothly to make direct eye contact with the lens and offers a subtle, confident smile. Soft breeze catches loose strands of her hair. Golden sunlight glints off the glass skyscraper windows in the background. Photorealistic human movement, natural blink rate, cinematic 24fps motion.
+```
+
+---
+
+## Production Video Prompt Recipes
+
+### 1. High-End Commercial Brand Video (Runway Gen-3 Alpha)
+
+```text
+Camera starts with a low-angle tracking shot gliding smoothly alongside a matte black electric performance sedan navigating a misty coastal highway at dusk. Damp asphalt reflects glowing red LED taillights and damp road spray. Headlights pierce through atmospheric sea fog. Camera accelerates and cranes upward into a wide aerial view as the vehicle rounds a sharp cliffside curve. Cinematic teal and amber color grade, volumetric ocean mist, natural vehicle physics, 4k commercial grade, slow motion 60fps.
+```
+
+---
+
+### 2. Documentary Historical Realism (OpenAI Sora)
+
+```text
+A continuous documentary-style handheld camera shot following an elderly artisan watchmaker in his cozy 19th-century Swiss workshop. Dust motes drift lazily through amber afternoon sunlight beaming across an oak workbench scattered with brass gears, springs, and precision tweezers. The watchmaker, wearing brass magnifying loupes, uses tweezers to delicately place a balance wheel into a pocket watch movement. Authentic mechanical tick motion, shallow depth of field, warm kodachrome film texture, realistic breathing and subtle hand micro-tremors.
+```
+
+---
+
+### 3. High-Velocity FPV Drone Flythrough (Kling 1.5 / Sora)
+
+```text
+An exhilarating, seamless FPV drone shot swooping through a dense futuristic neon cyberpunk metropolis during a torrential rainstorm. The drone weaves rapidly between massive glowing holographic billboards displaying Japanese kanji, dives vertically down a deep urban canyon between towering skyscrapers, and skims inches above puddles on a crowded street market. Water splashes violently across the lens, neon reflections streak across wet asphalt, high kinetic velocity, hyper-smooth gimbal stabilization.
+```
+
+---
+
+## Avoiding Video Artifacts: Negative Directives
+
+When prompting video generation engines, prevent common distortion anomalies with these physics rules:
+
+- **Morphing Prevention**: Explicitly state *"Subject maintains structural geometry; no melting, morphing, or disappearing limbs."*
+- **Speed Consistency**: Specify pacing (*"Slow, measured cinematic pace; no sudden robotic acceleration"*).
+- **Temporal Consistency**: Define persistent objects (*"The car remains fully intact and visible throughout the entire clip"*).
+
+---
+
+## Related Guides
+
+- [Image Generation Prompt Engineering](/docs/prompt-engineering/image-generation)
+- [Performance Marketing & Ad Creatives](/docs/prompt-engineering/marketing-and-cro)
+- [Master Prompt Engineering Overview](/docs/prompt-engineering)
+- [Brand Identity & Video Production Principles](/docs/company/vision-and-mission)
+

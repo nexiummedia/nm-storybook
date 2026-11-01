@@ -181,6 +181,15 @@ Use official Fumadocs components for callouts and structured navigation:
   ```
 - **Code Blocks**: Specify language tags (`ts`, `tsx`, `python`, `bash`, `yaml`, `json`, `dockerfile`, `sql`). Avoid unsupported tags like `env` or `gitignore` (use `bash` or `text` instead).
 
+### 4. Automatic "Last Updated" Timestamps
+Fumadocs automatically resolves the last modified timestamp for every documentation page directly from Git commit history:
+- **Local Development**: Runs `git log` behind the scenes during `npm run dev` and `npm run build`.
+- **Vercel Deployments**: Vercel performs shallow clones (`--depth=1`) by default. To allow Git to resolve accurate timestamps for historical commits, configure the environment variable:
+  ```bash
+  VERCEL_DEEP_CLONE=true
+  ```
+- **GitHub Actions Workflows**: If running a custom CI/CD runner, set `fetch-depth: 0` in `actions/checkout@v4` to fetch the complete commit history.
+
 ---
 
 ## 🤝 Contribution & Review Process
@@ -204,6 +213,3 @@ Use official Fumadocs components for callouts and structured navigation:
 ## 📄 License & Maintainers
 
 - **Owner**: Nexium Media Engineering Core Team
-- **Internal Contact**: [dev-team@nexiummedia.com](mailto:dev-team@nexiummedia.com)
-- **Website**: [https://www.nexiummedia.com](https://www.nexiummedia.com)
-- **Confidentiality**: Proprietary documentation for Nexium Media team members, contractors, and authorized partners.
