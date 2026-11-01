@@ -2,38 +2,125 @@
 title: Development Overview
 description: Engineering guidelines, code style standards, testing strategies, and system architecture at Nexium Media.
 ---
+## Software Engineering
 
-# Development Overview
+**At Nexium Media, we build modern, scalable, and reliable software solutions that help businesses solve real‑world problems.**
 
-At Nexium Media, we prioritize blazing-fast load times, clean modular architecture, static type safety, and seamless responsive design.
+Our software engineering practice combines frontend and backend development, database engineering, cloud infrastructure, API integrations, and modern development tools to deliver complete digital products. We work across multiple technologies and frameworks, selecting the right tools based on the requirements, complexity, and long‑term goals of each project.
 
-## Architecture Highlights
+### What We Do
 
-- **Frontend**: Next.js App Router, React 19, TypeScript strict mode, Tailwind CSS v4, Lucide React icons.
-- **Backend**: Node.js microservices, Next.js API route handlers, Prisma ORM, PostgreSQL.
-- **Payments & Billing**: Razorpay API integration with webhook signature validation for client bookings and subscriptions.
-- **Analytics & Marketing**: Google Tag Manager, Meta Pixel, automated conversion event tracking, and Google Search Console indexing.
-- **Hosting**: Edge-rendered deployments on Vercel and AWS CloudFront with automated CDN caching.
+Our engineering capabilities cover the complete software development lifecycle, from understanding business requirements to building, testing, deploying, and maintaining applications.
 
-## Subsections
+#### Web Application Development
 
-Explore frontend and backend guides below:
+We develop responsive, interactive, and scalable web applications using modern frontend and backend technologies. Our work includes business websites, dashboards, administrative panels, customer portals, SaaS platforms, and custom web‑based solutions.
 
-<Cards>
-  <Card
-    title="Frontend Engineering"
-    href="/docs/development/frontend"
-    description="Folder structure, UI component conventions, Tailwind design tokens, and Core Web Vitals optimization."
-  />
-  <Card
-    title="Backend Engineering"
-    href="/docs/development/backend"
-    description="REST API specs, database schemas, Razorpay webhooks, and JWT authentication flows."
-  />
-</Cards>
+#### Full‑Stack Development
 
-## Code Conventions
+We combine frontend interfaces, backend services, databases, and third‑party integrations to build complete applications. Our developers work across the application stack, ensuring that different components communicate effectively and operate as a cohesive system.
 
-1. **Strict TypeScript**: Never use `any`. Always use explicit schemas (Zod or TypeScript interfaces).
-2. **Performance Budget**: Initial JavaScript bundles must stay under 120KB per page.
-3. **SEO Colocation**: Every page route must export dynamic `Metadata` with OpenGraph images and canonical URLs.
+#### API Development and Integration
+
+We design and develop APIs that connect applications, services, and external platforms. Our integration capabilities include payment gateways, authentication providers, communication services, analytics platforms, and other business tools.
+
+#### Database Engineering
+
+We design and manage data structures that support application functionality, data integrity, and efficient retrieval. Our database work includes schema design, relationships, query optimization, migrations, and data management.
+
+#### Cloud and Application Deployment
+
+We work with modern deployment platforms and infrastructure tools to make applications available, reliable, and maintainable. Our engineering capabilities include application hosting, environment configuration, deployment automation, monitoring, and performance optimization.
+
+### Supported Technologies
+
+We work with multiple technologies across the software development stack. The following list represents our supported technology ecosystem. Individual projects may use a subset of these technologies depending on their requirements.
+
+#### Frontend Technologies
+
+| Technology | Primary use |
+|------------|-------------|
+| React | Component‑based user interfaces |
+| Next.js | Full‑stack React applications and web experiences |
+| Angular | Structured, scalable web applications |
+| TypeScript | Type‑safe application development |
+| JavaScript | Interactive application functionality |
+| Tailwind CSS | Responsive and consistent UI styling |
+
+#### Backend Technologies
+
+| Technology | Primary use |
+|------------|-------------|
+| Node.js | JavaScript server‑side development |
+| Express.js | REST APIs and backend services |
+| Python | General‑purpose backend development |
+| FastAPI | Python‑based APIs and web services |
+
+#### Databases
+
+| Technology | Primary use |
+|------------|-------------|
+| MongoDB | Document‑oriented data storage |
+| PostgreSQL | Relational database applications |
+| MySQL | Relational database applications |
+| SQL | Relational data querying and management |
+
+#### Additional Engineering Technologies
+
+| Technology | Primary use |
+|------------|-------------|
+| Git and GitHub | Version control and collaboration |
+| Docker | Application containerization |
+| Kubernetes | Container orchestration |
+| GitHub Actions | Automated development workflows |
+| Vercel | Web application deployment |
+| AWS | Cloud infrastructure and application services |
+| Prisma ORM | Database access and schema management |
+| Razorpay | Payment gateway integration |
+
+Technology selection depends on the project architecture, performance requirements, team expertise, security considerations, and operational costs.
+
+### Development Lifecycle
+
+Our development process follows a structured lifecycle to maintain consistency, quality, and accountability.
+
+1. **Requirement Analysis** – Understand the business problem, user requirements, and expected outcomes.
+2. **Planning and Architecture** – Define the application structure, technology choices, data flow, and implementation approach.
+3. **Development** – Implement the required functionality using established coding and engineering standards.
+4. **Testing and Quality Assurance** – Verify application behavior, identify defects, and ensure that critical requirements are satisfied.
+5. **Code Review** – Review changes for correctness, maintainability, security, and consistency.
+6. **Deployment** – Release approved changes through the appropriate deployment process.
+7. **Monitoring and Maintenance** – Monitor application behavior, resolve issues, and continuously improve the software.
+
+### Engineering Principles
+
+We follow a consistent set of principles across our software projects.
+
+- **Maintainable Architecture** – Prefer modular, understandable code that can be extended without unnecessary complexity.
+- **Performance and Scalability** – Consider application performance, resource utilization, and future growth when making engineering decisions.
+- **Security and Reliability** – Prioritize secure data handling, appropriate access controls, input validation, and reliable application behavior.
+- **Reusability and Consistency** – Encourage reusable components, shared utilities, consistent development patterns, and documented engineering standards.
+- **Continuous Improvement** – Continuously evaluate our tools, workflows, and technical decisions to improve development efficiency and software quality.
+
+### Development Tools and Practices
+
+Our developers use modern tools and engineering practices to collaborate effectively and maintain code quality.
+
+- **Version Control** – Git and GitHub support collaborative development, change tracking, code reviews, and controlled integration of code changes.
+- **Code Quality** – Linting, formatting, type checking, and automated testing tools maintain consistency and identify problems early.
+- **Testing** – Unit, integration, and end‑to‑end testing where appropriate to verify application behavior and reduce regressions.
+- **Documentation** – Technical documentation covering architecture, development workflows, APIs, and important engineering decisions.
+- **Automation** – Automation reduces repetitive tasks, improves consistency, and streamlines testing and deployment workflows.
+
+### Development Documentation
+
+Explore the dedicated engineering guides to learn more about our implementation standards and development processes:
+
+- [Frontend Engineering](/docs/development/frontend) — Frontend technologies, application architecture, components, and UI development.
+- [Backend Engineering](/docs/development/backend) — Backend frameworks, API development, database access, and integrations.
+- [GitHub Workflow](/docs/development/github) — Branch conventions, commit messages, pull requests, and code reviews.
+- [Testing & Quality](/docs/development/testing) — Testing strategies, code quality, and validation practices.
+- [Deployment & Release](/docs/development/deployment) — Deployment processes, release management, and application maintenance.
+- [Security & Performance](/docs/development/security-performance) — Security practices, performance optimization, and reliability.
+
+Our engineering practice is built around delivering practical software solutions through thoughtful architecture, modern technologies, and consistent development standards.

@@ -12,13 +12,7 @@ export function ThemeToggle() {
     setMounted(true);
   }, []);
 
-  if (!mounted) {
-    return (
-      <div className="h-8 w-8 rounded-lg border border-fd-border/50 bg-fd-muted/30" />
-    );
-  }
-
-  const isDark = resolvedTheme === 'dark';
+  const isDark = mounted && resolvedTheme === 'dark';
 
   return (
     <button
@@ -26,13 +20,17 @@ export function ThemeToggle() {
       onClick={() => setTheme(isDark ? 'light' : 'dark')}
       className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-fd-border/60 bg-fd-background text-fd-foreground hover:bg-fd-accent transition-colors cursor-pointer"
       aria-label="Toggle color theme"
+      suppressHydrationWarning
     >
-      {isDark ? (
-        <Sun className="h-4 w-4 text-amber-400" />
+      {mounted ? (
+        isDark ? (
+          <Sun className="h-4 w-4 text-amber-400" />
+        ) : (
+          <Moon className="h-4 w-4 text-slate-700" />
+        )
       ) : (
-        <Moon className="h-4 w-4 text-slate-700" />
+        <span className="h-4 w-4 opacity-0" aria-hidden="true" />
       )}
     </button>
   );
 }
-

@@ -1,0 +1,52 @@
+---
+title: "Branch Naming"
+description: "Standard naming conventions for Git branches."
+---
+
+# Branch Naming Convention
+
+<Callout type="tip">
+Consistent branch names make it easy to understand the purpose of a branch at a glance.
+</Callout>
+
+## Naming Pattern
+
+```
+<type>/<short-description>
+```
+
+- `<type>`: one of the predefined categories.
+- `<short-description>`: lowercase, hyphen‑separated, optionally include an issue number.
+
+## Allowed Types
+
+| Type | Description |
+|------|-------------|
+| `feat` | New feature development |
+| `fix` | Bug fix |
+| `refactor` | Code restructuring without functional change |
+| `docs` | Documentation changes |
+| `test` | Test additions or modifications |
+| `chore` | Maintenance tasks (e.g., dependencies) |
+| `hotfix` | Urgent production fixes |
+
+## Examples
+
+- `feat/profile-ui`
+- `fix/login-error`
+- `docs/github-guidelines`
+- `refactor/auth-service`
+- `test/payment-flow`
+
+## Rules
+
+1. Use only lowercase letters, numbers, and hyphens.
+2. Prefix with the appropriate `<type>`.
+3. Keep the description concise but meaningful.
+4. Avoid generic names like `temp` or `test`.
+5. Do **not** commit directly to `main` or `develop`.
+
+---
+
+Refer to the **Pull Request** section for the workflow after creating a branch.
+

@@ -1,25 +1,62 @@
 ---
-title: Frontend Overview
-description: Overview of frontend technology stack, principles, and UI development workflow at Nexium Media.
+title: Frontend Engineering Handbook
+description: Comprehensive guide for frontend development at Nexium Media, covering philosophy, technologies, lifecycle, and navigation.
 ---
 
-# Frontend Overview
+# Frontend Engineering Handbook
 
-Our frontend architecture is engineered for conversion rate optimization (CRO), lightning-fast page transitions, and effortless responsiveness across every mobile screen.
+Welcome to the **Frontend Engineering** reference for Nexium Media. This handbook consolidates best‑practice guidance, tooling, and architectural conventions for building modern, maintainable, and performant user interfaces.
 
-## Stack & Standards
+## Frontend Engineering Philosophy
 
-- **Framework**: Next.js App Router (React Server Components by default)
-- **Styling**: Tailwind CSS with custom CSS variables for light/dark themes
-- **Icons**: Lucide React
-- **Forms**: React Hook Form with Zod validation
-- **State**: React Query for async server state; lightweight React hooks for UI interactions
+We strive to create **maintainable, modular, and accessible** interfaces that deliver fast, responsive experiences.
 
-## Quick Navigation
+- **Modular UI** – Build small, reusable components with clear responsibilities.
+- **Responsiveness & Accessibility** – Design mobile‑first layouts, follow WCAG 2.1 AA standards, and ensure keyboard navigation.
+- **Component Reuse** – Leverage a shared component library and design tokens to keep visual consistency.
+- **Type Safety** – Use TypeScript throughout the stack to catch errors early and document intent.
+- **Performance‑First** – Optimize bundle size, use Next.js server‑components where appropriate, and employ caching strategies.
+- **Consistent Practices** – Follow linting, formatting, testing, and review standards across all projects.
 
-- **[Project Structure](/docs/development/frontend/project-structure)**: Directory layout, route handlers, and shared modules.
-- **[Component Library](/docs/development/frontend/components)**: Reusable buttons, inputs, modals, cards, and design tokens.
+## Supported Frontend Technologies
 
-<Callout type="tip">
-All client landing pages must pass Google Mobile-Friendly tests and score 90+ on Lighthouse Performance before entering staging review.
-</Callout>
+| Technology | Purpose |
+|------------|---------|
+| **React** | Component‑based UI development |
+| **Next.js** | Full‑stack React applications, routing, and server‑side rendering |
+| **Angular** | Structured, scalable applications (used on select projects) |
+| **TypeScript** | Type‑safe development |
+| **JavaScript** | Core scripting and browser interactions |
+| **Tailwind CSS** | Utility‑first styling, design tokens, and theming |
+| **HTML** | Semantic markup |
+| **CSS** | Layout, styling, and animations |
+
+> Individual projects may adopt a subset of these technologies based on requirements; they are not all required for every repository.
+
+## Frontend Development Lifecycle
+
+1. **Requirement Analysis** – Gather user flows and functional specs.
+2. **Architecture Review** – Assess existing component hierarchy and data sources.
+3. **Component Planning** – Define component boundaries, props, and state handling.
+4. **Implementation** – Write UI code, apply design tokens, and ensure type safety.
+5. **Testing** – Run unit, integration, and accessibility tests.
+6. **Code Quality Checks** – Lint, format, and type‑check.
+7. **Pull Request** – Follow the GitHub Workflow guidelines.
+8. **Review & Merge** – Ensure performance, accessibility, and test coverage.
+9. **Deployment** – Deploy via the standard CI/CD pipeline.
+
+## Documentation Navigation
+
+Explore the detailed sections below. Each group expands in the sidebar under **Development → Frontend**.
+
+<Cards>
+  <Card title="Getting Started" href="/docs/development/frontend/getting-started" description="Setup environment, install dependencies, and run the dev server." />
+  <Card title="Fundamentals" href="/docs/development/frontend/fundamentals" description="Core web technologies: HTML, CSS, JavaScript, TypeScript, React, and Next.js." />
+  <Card title="Project Structure" href="/docs/development/frontend/project-structure" description="Recommended folder layout and naming conventions." />
+  <Card title="UI Components" href="/docs/development/frontend/ui-components" description="Guidelines for building reusable, accessible components." />
+  <Card title="Styling" href="/docs/development/frontend/styling" description="Tailwind CSS conventions, design tokens, and responsive design." />
+  <Card title="State & Data" href="/docs/development/frontend/state-and-data" description="State management, data fetching, and API integration patterns." />
+  <Card title="Testing" href="/docs/development/frontend/testing" description="Unit, integration, and end‑to‑end testing strategies." />
+  <Card title="Quality" href="/docs/development/frontend/quality" description="Accessibility, performance, SEO, security, and code review standards." />
+  <Card title="Workflows" href="/docs/development/frontend/workflows" description="Local development, debugging, build, deployment, and troubleshooting." />
+</Cards>

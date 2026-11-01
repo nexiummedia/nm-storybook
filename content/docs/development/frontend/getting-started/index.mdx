@@ -1,0 +1,150 @@
+---
+title: Getting Started
+description: Onboarding guide and core prerequisites for frontend engineers contributing to Nexium Media projects.
+---
+
+Setting up a reliable local environment is the foundational first step for any frontend engineer joining Nexium Media. Our client projects rely on modern React, Next.js App Router, strict TypeScript configurations, and standardized linting and testing toolchains.
+
+This guide outlines prerequisites, repository onboarding workflows, environment secret conventions, and everyday development scripts.
+
+## Prerequisites
+
+Before cloning any Nexium Media repository, verify that your workstation satisfies the minimum environment matrix:
+
+| Tool | Required Version | Verification Command | Notes |
+| :--- | :--- | :--- | :--- |
+| **Node.js** | `>= 20.12.0 LTS` (Active LTS) | `node -v` | Managed via `nvm` or `nvm-windows`. |
+| **npm** | `>= 10.5.0` | `npm -v` | Bundled with Node; use `npm ci` for deterministic installs. |
+| **Git** | `>= 2.40.0` | `git --version` | Configured with company email & SSH keys. |
+| **VS Code** | Latest Stable | `code -v` | Recommended IDE with Nexium extension pack. |
+
+<Callout type="note">
+Certain legacy or client-specific enterprise projects may lock specific runtime versions using an `.nvmrc` file in the project root. Always run `nvm use` after switching branches or pulling new repositories.
+</Callout>
+
+## Cloning a Repository & Git Setup
+
+All Nexium Media frontend codebases reside under the enterprise GitHub organization. We strictly enforce SSH for repository operations.
+
+```bash
+# Configure your identity globally (or locally per repo if using a dedicated work profile)
+git config --global user.name "Your Full Name"
+git config --global user.email "your.name@nexiummedia.com"
+
+# Clone using SSH (replace repo with your target project)
+git clone git@github.com:nexiummedia/client-portal-web.git
+cd client-portal-web
+
+# Ensure you are on the canonical integration branch (develop or main)
+git checkout develop
+git pull origin develop
+```
+
+## Installing Dependencies
+
+Always use `npm ci` (Clean Install) rather than `npm install` when onboarding or checking out fresh code. `npm ci` bypasses package resolution and directly reads `package-lock.json`, ensuring exact dependency tree parity across all 100+ engineers and CI pipelines.
+
+```bash
+# Clean install exact lockfile dependencies
+npm ci
+```
+
+<Callout type="warning">
+Never run `npm install <package>` casually without engineering lead approval on established client repositories. An unpinned or unintended lockfile update can trigger cascading regression across monorepo packages or CI build pipelines.
+</Callout>
+
+## Environment Variables Configuration
+
+Nexium Media repositories never commit secrets, access keys, or production API tokens into source control. Every repository ships with an annotated `.env.example` file.
+
+```bash
+# Copy template to the local untracked environment file
+cp .env.example .env.local
+```
+
+### Environment File Hierarchy in Next.js
+
+Next.js evaluates environment files in the following priority order (from highest precedence to lowest):
+
+1. `process.env` (system-level or CI injection)
+2. `.env.development.local` / `.env.production.local` / `.env.local`
+3. `.env.development` / `.env.production`
+4. `.env`
+
+```bash
+# .env.local - Sample Local Overrides
+NEXT_PUBLIC_APP_ENV="development"
+NEXT_PUBLIC_API_BASE_URL="http://localhost:4000/api/v1"
+SESSION_SECRET="dev-secret-only-not-for-production-min-32-chars-long"
+ANALYTICS_WRITE_KEY="local_mock_token"
+```
+
+<Callout type="warning">
+Variables exposed to client browsers must explicitly carry the `NEXT_PUBLIC_` prefix. Never attach secret database strings, private keys, or microservice credentials to `NEXT_PUBLIC_` variables.
+</Callout>
+
+## Running the Development Server
+
+Start the Next.js local development server with hot module replacement (HMR):
+
+```bash
+npm run dev
+```
+
+By default, the server listens at `http://localhost:3000`. If port 3000 is occupied by another running instance, pass the custom port flag:
+
+```bash
+npm run dev -- -p 3005
+```
+
+## Standard Available Scripts
+
+All Nexium Media frontend repositories standardize their `package.json` scripts interface to maintain predictability across micro-frontends and full-stack Next.js applications:
+
+| Script | Command | Purpose |
+| :--- | :--- | :--- |
+| `npm run dev` | `next dev` | Boots local HMR development server. |
+| `npm run build` | `next build` | Produces optimized production output in `.next/`. |
+| `npm run start` | `next start` | Boots standard Node production server using build artifacts. |
+| `npm run lint` | `next lint` | Executes ESLint with Nexium flat configuration rules. |
+| `npm run lint:fix` | `eslint --fix .` | Automatically resolves autofixable code-style issues. |
+| `npm run typecheck` | `tsc --noEmit` | Runs TypeScript compiler checks without emitting JS files. |
+| `npm run test` | `jest` | Runs unit and component test suites via Jest / RTL. |
+| `npm run test:watch` | `jest --watch` | Runs test suites in interactive watch mode for active TDD. |
+| `npm run test:e2e` | `playwright test` | Executes end-to-end integration tests headlessly. |
+
+<Callout type="tip">
+Run `npm run typecheck` before pushing your branch. ESLint checks syntax and style, but only `tsc --noEmit` validates the strict type graph across all modules.
+</Callout>
+
+## Common Setup Issues & Immediate Remediation
+
+### 1. `Node Sass does not support current environment` or Native Addon Build Errors
+- **Cause**: Outdated global build tools or architecture mismatch (e.g., Apple Silicon arm64 vs x86_64 or Windows C++ build tools).
+- **Remediation**: Remove `node_modules` and re-run with matching Node LTS:
+  ```bash
+  rm -rf node_modules package-lock.json
+  npm cache clean --force
+  npm ci
+  ```
+
+### 2. Port Collision (`EADDRINUSE: address already in use :::3000`)
+- **Remediation (Windows)**:
+  ```powershell
+  Get-Process -Id (Get-NetTCPConnection -LocalPort 3000).OwningProcess | Stop-Process -Force
+  ```
+- **Remediation (macOS/Linux)**:
+  ```bash
+  lsof -ti :3000 | xargs kill -9
+  ```
+
+### 3. Missing Client Secrets or Hydration Crashes on Boot
+- **Cause**: Incomplete `.env.local` synchronization.
+- **Remediation**: Check that all keys defined in `.env.example` are present in `.env.local`. Inspect terminal output during Next.js boot for missing environment variable warnings triggered by Zod validation schemas.
+
+## Related
+
+- [Installation & Toolchain Guide](/docs/development/frontend/getting-started/installation)
+- [Development Environment Setup](/docs/development/frontend/getting-started/development-environment)
+- [Project Setup & Scaffolding](/docs/development/frontend/getting-started/project-setup)
+- [Code Review Standards](/docs/development/frontend/quality/code-review)

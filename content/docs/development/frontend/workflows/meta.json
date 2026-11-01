@@ -1,0 +1,6 @@
+{
+  "title": "Workflows",
+  "description": "Daily development cadence, deep-dive debugging, CI/CD deployment, and troubleshooting runbooks.",
+  "pages": ["index", "local-development", "debugging", "build-and-deployment", "troubleshooting"]
+}
+

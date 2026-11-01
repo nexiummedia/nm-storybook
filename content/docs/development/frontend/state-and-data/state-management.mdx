@@ -1,0 +1,241 @@
+---
+title: State Management Architecture
+description: Deep dive into local component state, state machines with useReducer, React Context optimization, and scalable Zustand store slicing.
+---
+
+Selecting the right state management tool is critical to building scalable applications. Over-engineering with global stores increases boilerplate and introduces unnecessary render triggers, while under-engineering with excessive prop drilling creates fragile component trees.
+
+This guide provides practical patterns for local state, complex state machines via `useReducer`, domain-split Context, and enterprise **Zustand** architectures.
+
+## Local State: `useState` & State Co-Location
+
+The fundamental rule of state management at Nexium Media is **State Co-location**: keep state as close as possible to the components that consume and mutate it.
+
+```tsx
+// Correct: Modal visibility state co-located directly within parent trigger view
+export function ProjectCard({ project }: { project: Project }) {
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+
+  return (
+    <article className="border p-4">
+      <h3>{project.name}</h3>
+      <button onClick={() => setIsConfirmOpen(true)}>Archive</button>
+      {isConfirmOpen && <ArchiveConfirmationDialog onClose={() => setIsConfirmOpen(false)} />}
+    </article>
+  );
+}
+```
+
+Do not move state into global stores unless multiple distant branches of the component tree truly require access to it.
+
+## Complex State Machines with `useReducer`
+
+When state transitions involve multiple fields that change together based on specific action types, `useReducer` provides predictable, deterministic state changes:
+
+```tsx
+// features/cart/cart-reducer.ts
+export interface CartItem {
+  id: string;
+  name: string;
+  price: number;
+  quantity: number;
+}
+
+export interface CartState {
+  items: CartItem[];
+  couponCode: string | null;
+  discountPercentage: number;
+}
+
+export type CartAction =
+  | { type: "ADD_ITEM"; payload: CartItem }
+  | { type: "REMOVE_ITEM"; payload: { id: string } }
+  | { type: "UPDATE_QUANTITY"; payload: { id: string; quantity: number } }
+  | { type: "APPLY_DISCOUNT"; payload: { code: string; percentage: number } }
+  | { type: "RESET_CART" };
+
+export const initialCartState: CartState = {
+  items: [],
+  couponCode: null,
+  discountPercentage: 0,
+};
+
+export function cartReducer(state: CartState, action: CartAction): CartState {
+  switch (action.type) {
+    case "ADD_ITEM": {
+      const existing = state.items.find((i) => i.id === action.payload.id);
+      if (existing) {
+        return {
+          ...state,
+          items: state.items.map((i) =>
+            i.id === action.payload.id ? { ...i, quantity: i.quantity + action.payload.quantity } : i
+          ),
+        };
+      }
+      return { ...state, items: [...state.items, action.payload] };
+    }
+    case "REMOVE_ITEM":
+      return { ...state, items: state.items.filter((i) => i.id !== action.payload.id) };
+    case "UPDATE_QUANTITY":
+      return {
+        ...state,
+        items: state.items.map((i) =>
+          i.id === action.payload.id ? { ...i, quantity: Math.max(1, action.payload.quantity) } : i
+        ),
+      };
+    case "APPLY_DISCOUNT":
+      return { ...state, couponCode: action.payload.code, discountPercentage: action.payload.percentage };
+    case "RESET_CART":
+      return initialCartState;
+    default:
+      return state;
+  }
+}
+```
+
+## React Context: Domain Splitting & Performance
+
+React Context is designed for low-frequency global values (theme, active locale, authenticated identity).
+
+<Callout type="warning">
+When a Context value changes, every component that calls `useContext` for that context re-renders, even if it only uses an unaffected field. Never store high-frequency values (e.g., text inputs, mouse coordinates, live timers) in React Context.
+</Callout>
+
+### Splitting Context by Domain
+Split state and dispatch functions into separate contexts to prevent unnecessary re-renders:
+
+```tsx
+// contexts/SidebarContext.tsx
+import * as React from "react";
+
+const SidebarStateContext = React.createContext<{ isOpen: boolean } | undefined>(undefined);
+const SidebarDispatchContext = React.createContext<(() => void) | undefined>(undefined);
+
+export function SidebarProvider({ children }: { children: React.ReactNode }) {
+  const [isOpen, setIsOpen] = React.useState(true);
+  const toggle = React.useCallback(() => setIsOpen((prev) => !prev), []);
+
+  return (
+    <SidebarStateContext.Provider value={{ isOpen }}>
+      <SidebarDispatchContext.Provider value={toggle}>
+        {children}
+      </SidebarDispatchContext.Provider>
+    </SidebarStateContext.Provider>
+  );
+}
+
+// Components that only toggle the sidebar do NOT re-render when isOpen changes!
+export function useSidebarToggle() {
+  const context = React.useContext(SidebarDispatchContext);
+  if (!context) throw new Error("useSidebarToggle must be used within SidebarProvider");
+  return context;
+}
+```
+
+## Global State with Zustand
+
+When client state needs to be accessed across disparate routes and components, we standardize on **Zustand**. Zustand avoids provider nesting, supports granular property subscriptions to prevent unnecessary renders, and offers zero boilerplate.
+
+```bash
+npm install zustand immer
+```
+
+### The Slices Pattern in TypeScript
+
+For large applications, partition store logic into modular slices:
+
+```typescript
+// stores/useAppStore.ts
+import { create } from "zustand";
+import { devtools } from "zustand/middleware";
+import { immer } from "zustand/middleware/immer";
+
+// 1. Slice A: User Preferences
+interface UserPreferencesSlice {
+  theme: "light" | "dark" | "system";
+  isSidebarCollapsed: boolean;
+  setTheme: (theme: "light" | "dark" | "system") => void;
+  toggleSidebar: () => void;
+}
+
+// 2. Slice B: Notification Tray
+interface NotificationSlice {
+  notifications: string[];
+  addNotification: (message: string) => void;
+  clearNotifications: () => void;
+}
+
+type CombinedStore = UserPreferencesSlice & NotificationSlice;
+
+export const useAppStore = create<CombinedStore>()(
+  devtools(
+    immer((set) => ({
+      // Preferences Slice
+      theme: "system",
+      isSidebarCollapsed: false,
+      setTheme: (theme) =>
+        set((state) => {
+          state.theme = theme;
+        }),
+      toggleSidebar: () =>
+        set((state) => {
+          state.isSidebarCollapsed = !state.isSidebarCollapsed;
+        }),
+
+      // Notifications Slice
+      notifications: [],
+      addNotification: (message) =>
+        set((state) => {
+          state.notifications.push(message); // Immer enables safe mutating syntax
+        }),
+      clearNotifications: () =>
+        set((state) => {
+          state.notifications = [];
+        }),
+    })),
+    { name: "NexiumAppStore" }
+  )
+);
+```
+
+### Selective Component Subscription
+Subscribe only to the specific slices or properties a component needs:
+
+```tsx
+// This component re-renders ONLY when isSidebarCollapsed changes, ignoring theme or notifications updates
+export function SidebarCollapseButton() {
+  const isCollapsed = useAppStore((state) => state.isSidebarCollapsed);
+  const toggle = useAppStore((state) => state.toggleSidebar);
+
+  return <button onClick={toggle}>{isCollapsed ? "Expand" : "Collapse"}</button>;
+}
+```
+
+## Common Anti-Patterns
+
+### 1. Storing Derived State
+Never duplicate state that can be computed on the fly during render:
+
+```tsx
+// Anti-Pattern: Syncing derived state in useEffect
+const [items, setItems] = useState<Item[]>([]);
+const [total, setTotal] = useState(0);
+
+useEffect(() => {
+  setTotal(items.reduce((acc, item) => acc + item.price, 0));
+}, [items]);
+
+// Best Practice: Pure derivation during render
+const total = items.reduce((acc, item) => acc + item.price, 0);
+```
+
+### 2. Global State for Everything
+Putting local form values, accordion toggles, or search inputs into Zustand or Redux pollutes the global namespace, complicates testing, and degrades performance. Keep state local whenever possible.
+
+## Related
+
+- [State & Data Architecture Overview](/docs/development/frontend/state-and-data)
+- [Data Fetching & Server Cache](/docs/development/frontend/state-and-data/data-fetching)
+- [React Architecture & Hooks](/docs/development/frontend/fundamentals/react)
+- [Forms & Validation](/docs/development/frontend/ui-components/forms-and-validation)
+

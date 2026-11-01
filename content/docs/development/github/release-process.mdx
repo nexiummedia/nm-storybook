@@ -1,0 +1,51 @@
+---
+title: "Release Process"
+description: "Steps for preparing, tagging, and deploying releases."
+---
+
+# Release Process
+
+<Callout type="tip">
+A well‑defined release process reduces downtime and ensures traceability.
+</Callout>
+
+## 1. Prepare the Release
+
+- **Update Changelog** – add entries for new features, bug fixes, and breaking changes.
+- **Increment Version** – follow Semantic Versioning (`MAJOR.MINOR.PATCH`).
+  ```bash
+  # Example using npm version
+  npm version patch   # or minor / major
+  ```
+- **Run Full Test Suite** – ensure all tests pass on `develop`.
+- **Create a Release Branch** (optional for major releases):
+  ```bash
+  git checkout -b release/v1.2.0 develop
+  ```
+
+## 2. Tag the Release
+
+```bash
+git tag -a v1.2.0 -m "Release v1.2.0 – minor updates"
+# Push tags to remote
+git push origin v1.2.0
+```
+
+## 3. Deploy
+
+- **Staging Deployment** – deploy the release tag to a staging environment for final verification.
+- **Production Deployment** – once approved, trigger the production CI/CD pipeline (e.g., via GitHub Actions).
+
+## 4. Post‑Release
+
+- **Verify** – check the live site, monitor logs, and confirm no regressions.
+- **Announce** – notify the team and relevant stakeholders.
+- **Rollback Plan** – if critical issues arise, revert to the previous tag:
+  ```bash
+  git revert v1.2.0   # or checkout previous tag and redeploy
+  ```
+
+---
+
+> **Tip**: Automate version bumping and changelog generation with tools like `standard-version` to keep the process consistent.
+

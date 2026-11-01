@@ -1,0 +1,234 @@
+---
+title: End-to-End Automation with Playwright
+description: High-fidelity end-to-end testing with Playwright, Page Object Models, cross-browser CI matrices, visual regression, and debugging workflows.
+---
+
+End-to-End (E2E) tests run inside real headless and headed browsers (Chromium, Firefox, WebKit), exercising the entire full-stack application from HTML delivery and client hydration to backend database writes. Because E2E tests are the slowest and most resource-intensive tier of the testing pyramid, Nexium Media reserves them for **critical user journeys** (e.g., user signup, subscription checkout, document signing, and data export).
+
+This guide details our configuration standards using **Playwright**, Page Object Models, session storage reuse, and CI parallelism.
+
+## When Are E2E Tests Worth the Cost?
+
+| Test Layer | Appropriate Test Target | Example Scenario |
+| :--- | :--- | :--- |
+| **Unit / RTL** | Isolated component logic, formatting, local state. | Button loading states, date formatting, Zod schema validation. |
+| **Integration** | Multi-component flows with mocked network calls. | Filter panel updating table rows, client-side validation errors. |
+| **End-to-End** | Critical revenue paths and multi-service flows. | User completes registration → receives email → enters dashboard → adds credit card → upgrades plan. |
+
+<Callout type="warning">
+Do not use E2E tests to check every UI permutation, badge color, or simple validation rule. Doing so causes long CI runtimes (30+ minutes) and leads to flaky, brittle pipelines.
+</Callout>
+
+## Playwright Setup & Configuration
+
+Bootstrap Playwright in the project repository:
+
+```bash
+npm install -D @playwright/test
+npx playwright install --with-deps
+```
+
+### Configuration (`playwright.config.ts`)
+
+```typescript
+// playwright.config.ts
+import { defineConfig, devices } from "@playwright/test";
+
+export default defineConfig({
+  testDir: "./__tests__/e2e",
+  fullyParallel: true,
+  forbidOnly: !!process.env.CI,
+  retries: process.env.CI ? 2 : 0,
+  workers: process.env.CI ? 2 : undefined,
+  reporter: [["html"], ["list"]],
+  use: {
+    baseURL: process.env.PLAYWRIGHT_BASE_URL || "http://localhost:3000",
+    trace: "on-first-retry",
+    screenshot: "only-on-failure",
+    video: "retain-on-failure",
+  },
+  projects: [
+    {
+      name: "chromium",
+      use: { ...devices["Desktop Chrome"] },
+    },
+    {
+      name: "firefox",
+      use: { ...devices["Desktop Firefox"] },
+    },
+    {
+      name: "webkit",
+      use: { ...devices["Desktop Safari"] },
+    },
+    {
+      name: "Mobile Chrome",
+      use: { ...devices["Pixel 5"] },
+    },
+  ],
+  webServer: {
+    command: "npm run build && npm run start",
+    url: "http://localhost:3000",
+    reuseExistingServer: !process.env.CI,
+    timeout: 120 * 1000,
+  },
+});
+```
+
+## The Page Object Model (POM) Pattern
+
+Encapsulate DOM selectors, interactions, and assertions inside dedicated Page Object classes. This keeps test specifications readable and ensures that markup updates only require changes in one place:
+
+```typescript
+// __tests__/e2e/pages/LoginPage.ts
+import { type Page, type Locator, expect } from "@playwright/test";
+
+export class LoginPage {
+  readonly page: Page;
+  readonly emailInput: Locator;
+  readonly passwordInput: Locator;
+  readonly submitButton: Locator;
+  readonly errorMessage: Locator;
+
+  constructor(page: Page) {
+    this.page = page;
+    this.emailInput = page.getByLabel(/corporate email/i);
+    this.passwordInput = page.getByLabel(/password/i);
+    this.submitButton = page.getByRole("button", { name: /sign in/i });
+    this.errorMessage = page.getByRole("alert");
+  }
+
+  async goto() {
+    await this.page.goto("/login");
+  }
+
+  async login(email: string, pass: string) {
+    await this.emailInput.fill(email);
+    await this.passwordInput.fill(pass);
+    await this.submitButton.click();
+  }
+
+  async expectErrorMessage(text: string | RegExp) {
+    await expect(this.errorMessage).toBeVisible();
+    await expect(this.errorMessage).toContainText(text);
+  }
+}
+```
+
+## Writing a Clean E2E Test Suite
+
+```typescript
+// __tests__/e2e/auth.spec.ts
+import { test, expect } from "@playwright/test";
+import { LoginPage } from "./pages/LoginPage";
+
+test.describe("Authentication Workflows", () => {
+  let loginPage: LoginPage;
+
+  test.beforeEach(async ({ page }) => {
+    loginPage = new LoginPage(page);
+    await loginPage.goto();
+  });
+
+  test("rejects invalid login credentials and displays alert", async () => {
+    await loginPage.login("unknown@nexiummedia.com", "WrongPassword123!");
+    await loginPage.expectErrorMessage(/invalid email or password/i);
+  });
+
+  test("authenticates valid user and redirects to dashboard", async ({ page }) => {
+    await loginPage.login("admin@nexiummedia.com", "CorrectPassword123!");
+
+    // Wait for URL redirect to dashboard
+    await expect(page).toHaveURL(/\/dashboard/);
+    await expect(page.getByRole("heading", { name: /analytics overview/i })).toBeVisible();
+  });
+});
+```
+
+## Authentication State Caching: Login Once
+
+To avoid repeating the login flow in every single test, authenticate once during a global setup phase and save the resulting storage state (cookies, local storage) to a JSON file:
+
+```typescript
+// __tests__/e2e/auth.setup.ts
+import { test as setup, expect } from "@playwright/test";
+
+const authFile = "playwright/.auth/user.json";
+
+setup("authenticate session", async ({ page }) => {
+  await page.goto("/login");
+  await page.getByLabel(/email/i).fill("admin@nexiummedia.com");
+  await page.getByLabel(/password/i).fill("SecretPass123!");
+  await page.getByRole("button", { name: /sign in/i }).click();
+
+  await page.waitForURL("/dashboard");
+  await expect(page.getByText(/welcome back/i)).toBeVisible();
+
+  // Save authenticated state to file
+  await page.context().storageState({ path: authFile });
+});
+```
+
+Configure your tests to consume this saved state:
+
+```typescript
+// playwright.config.ts (Project Configuration)
+{
+  name: "authenticated tests",
+  dependencies: ["authenticate session"],
+  use: {
+    storageState: "playwright/.auth/user.json",
+  },
+}
+```
+
+## Visual Regression Testing
+
+Playwright can capture and compare pixel-by-pixel screenshots against saved baseline images:
+
+```typescript
+test("dashboard visual baseline regression check", async ({ page }) => {
+  await page.goto("/dashboard");
+
+  // Wait for loading skeletons to resolve
+  await page.waitForSelector("[data-testid='dashboard-content']");
+
+  // Assert screenshot matches committed baseline within pixel tolerance
+  await expect(page).toHaveScreenshot("dashboard-desktop.png", {
+    maxDiffPixelRatio: 0.02, // 2% tolerance threshold
+  });
+});
+```
+
+## Debugging E2E Failures
+
+When tests fail in CI, use Playwright's diagnostic tools to investigate:
+
+1. **Trace Viewer**: Inspect the step-by-step DOM state, network timeline, and console logs:
+   ```bash
+   npx playwright show-trace test-results/path-to-trace.zip
+   ```
+2. **Interactive UI Mode**: Run tests with a live, step-by-step visual runner:
+   ```bash
+   npx playwright test --ui
+   ```
+3. **Headed Debugging**: Pause execution and open browser dev tools:
+   ```bash
+   npx playwright test --debug
+   ```
+
+## Tooling Comparison: Playwright vs. Cypress
+
+| Feature | Playwright (Nexium Standard) | Cypress (Legacy) |
+| :--- | :--- | :--- |
+| **Architecture** | Native DevTools protocol (out-of-process). | In-browser iframe runner. |
+| **Cross-Browser** | Native Chromium, Firefox, WebKit (Safari). | Chrome, Edge, Firefox (WebKit experimental). |
+| **Multi-Tab / Multi-Window**| First-class support for multiple pages and origins. | Limited / complex workarounds. |
+| **Execution Speed** | Extremely fast, native parallel execution. | Slower due to DOM injection overhead. |
+
+## Related
+
+- [Testing Architecture Overview](/docs/development/frontend/testing)
+- [Unit Testing Standards](/docs/development/frontend/testing/unit-testing)
+- [Integration Testing with MSW](/docs/development/frontend/testing/integration-testing)
+- [Local Development & CI Workflows](/docs/development/frontend/workflows/local-development)
+

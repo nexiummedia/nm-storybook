@@ -1,0 +1,52 @@
+---
+title: "Merging"
+description: "Best practices for merging branches and handling conflicts."
+---
+
+# Merging Guide
+
+<Callout type="tip">
+Choose the right merge strategy to keep history clean and avoid unnecessary conflicts.
+</Callout>
+
+## Merge Strategies
+
+| Strategy | Description |
+|---|---|
+| **Merge Commit** | Preserves all commits; creates a merge commit on the target branch. |
+| **Squash and Merge** | Combines all feature branch commits into a single commit; ideal for clean history. |
+| **Rebase and Merge** | Rewrites feature branch commits onto the tip of the target branch before merging. |
+
+## Recommended Workflow
+
+1. **Sync with target branch** before merging.
+   ```bash
+   git checkout develop
+   git pull origin develop
+   git checkout <your-branch>
+   git rebase develop
+   ```
+2. **Resolve any conflicts** that arise during rebase.
+3. **Push the updated branch** (force‑push if rebased).
+   ```bash
+   git push -f origin <your-branch>
+   ```
+4. **Open a PR** and select **Squash and Merge** (or **Merge Commit** if preserving detailed history is required).
+5. **Delete the feature branch** after merge (optional but recommended).
+
+## Handling Merge Conflicts
+
+- Identify conflicting files shown by Git.
+- Open the files, locate conflict markers (`<<<<<<`, `======`, `>>>>>>`).
+- Choose the correct version or combine changes.
+- Mark the conflict as resolved:
+  ```bash
+  git add <resolved-file>
+  git rebase --continue   # if in a rebase
+  ```
+- Run tests to ensure nothing broke.
+
+---
+
+> **Note**: Always ensure CI passes before merging to main or release branches.
+

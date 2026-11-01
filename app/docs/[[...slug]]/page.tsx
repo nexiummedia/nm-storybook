@@ -18,7 +18,6 @@ export default async function Page(props: {
     <DocsPage
       toc={page.data.toc}
       full={page.data.full}
-      lastUpdate={new Date("2026-10-31")}
       editOnGithub={{
         owner: 'nexium-media',
         repo: 'documentation',

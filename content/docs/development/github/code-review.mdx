@@ -1,0 +1,40 @@
+---
+title: "Code Review"
+description: "Guidelines and responsibilities for code reviews."
+---
+
+# Code Review Guidelines
+
+<Callout type="tip">
+Effective reviews improve code quality and knowledge sharing.
+</Callout>
+
+## Reviewer Responsibilities
+
+- **Understand the scope** – read the PR description and related issue.
+- **Check functionality** – run the app locally, test UI changes, verify API behavior.
+- **Verify standards** – linting, code style, naming conventions, and documentation.
+- **Assess impact** – consider performance, security, and backward compatibility.
+- **Provide actionable feedback** – comment inline, suggest improvements, ask clarifying questions.
+- **Approve** – once all concerns are addressed and CI passes.
+
+## Author Responsibilities
+
+- **Prepare a clear PR** – concise title, detailed description, link to issue.
+- **Respond promptly** – address reviewer comments, push fixes.
+- **Include tests** – unit/integration tests for new functionality.
+- **Update documentation** – if the change affects user‑facing docs.
+
+## Review Process
+
+1. **Assign reviewers** – at least one teammate, optionally a designated senior reviewer.
+2. **Run CI** – ensure all checks pass before starting the review.
+3. **Comment** – add inline comments or summary feedback.
+4. **Resolve** – author updates the PR, resolves conversations.
+5. **Approve** – reviewer clicks **Approve** once satisfied.
+6. **Merge** – follow the **Merging** guide.
+
+---
+
+> **Best Practice**: Aim for review cycles under 24 hours to keep development momentum.
+

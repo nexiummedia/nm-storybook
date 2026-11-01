@@ -1,0 +1,175 @@
+---
+title: Local Development Workflows
+description: Daily engineering practices, Next.js Fast Refresh ergonomics, containerized support services, feature flags, and isolated component development.
+---
+
+A streamlined local development environment allows frontend engineers to build and iterate on features quickly. When local workflows are standardized, developers spend their time delivering business value rather than troubleshooting environment drift, conflicting dependencies, or broken local services.
+
+This guide details our daily development cadence, Fast Refresh patterns, Docker Compose dependencies, feature flagging workflows, and isolated component development.
+
+## The Daily Engineering Workflow
+
+Follow these steps when starting work on a new feature or bug fix:
+
+### 1. Synchronize the Base Branch
+
+```bash
+# Switch to the primary integration branch
+git checkout develop
+
+# Fetch latest commits and purge deleted remote tracking references
+git fetch --prune
+git pull origin develop
+
+# Clean install dependencies if package-lock.json was updated
+npm ci
+```
+
+### 2. Create a Feature Branch
+
+Follow our branch naming conventions:
+
+```bash
+# Pattern: feature/<issue-id>-<short-description>
+git checkout -b feature/NX-2041-team-invite-modal
+
+# For bugfixes: fix/<issue-id>-<short-description>
+git checkout -b fix/NX-2099-table-pagination-overflow
+```
+
+### 3. Start Local Development Services
+
+Start any required local databases or support services using Docker Compose, then launch the Next.js development server:
+
+```bash
+# Boot background dependencies (Postgres, Redis)
+docker compose -f docker-compose.dev.yml up -d
+
+# Start Next.js development server with Turbopack / Fast Refresh
+npm run dev
+```
+
+Navigate to `http://localhost:3000`.
+
+## Interactive Test-Driven Development (TDD)
+
+Run your unit and component test suites in interactive watch mode alongside the development server:
+
+```bash
+# Jest interactive watch mode (reruns tests matching changed files)
+npm run test:watch
+```
+
+While in watch mode, press:
+- `p`: Filter tests by filename pattern.
+- `t`: Filter tests by test name regex.
+- `a`: Rerun all tests across the entire repository.
+- `q`: Exit watch mode.
+
+For end-to-end user journey tests, launch Playwright's visual UI mode:
+
+```bash
+npx playwright test --ui
+```
+
+## Next.js Fast Refresh Ergonomics
+
+Next.js Fast Refresh automatically updates the browser as you edit components while preserving local component state. To keep Fast Refresh working smoothly:
+
+- **Export Function Components Only**: Fast Refresh only preserves state for files that export exclusively React components. If a file exports both a component and a plain object or constant, Next.js will perform a full page reload when edited.
+- **Keep Hook Dependencies Pure**: If an effect or callback references an unstable function created during render, Fast Refresh may re-run the effect repeatedly.
+
+<Callout type="tip">
+If Fast Refresh appears stuck or the error overlay fails to dismiss after fixing a syntax error, perform a hard refresh (`Cmd + Shift + R` or `Ctrl + F5`) or restart the dev server to clear the SWC in-memory cache.
+</Callout>
+
+## Local Environment Variable Management
+
+Manage environment variables with `.env.local`:
+
+```bash
+# Ensure local secrets match the committed template
+cp .env.example .env.local
+```
+
+### Key Practices
+- **Never Commit Secrets**: Confirm `.env.local` is listed in `.repo/.gitignore`.
+- **Hot Reloading Env Vars**: Next.js automatically reloads environment variables when `.env.local` is modified, without requiring a server restart.
+- **Client vs. Server Variables**: Remember that only variables with the `NEXT_PUBLIC_` prefix are accessible in browser client components.
+
+## Running Supporting Services with Docker Compose
+
+Enterprise client applications often require local databases (PostgreSQL), cache stores (Redis), or search indexes (Meilisearch):
+
+```yaml
+# docker-compose.dev.yml
+version: "3.8"
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: nx-postgres-local
+    environment:
+      POSTGRES_DB: client_portal_dev
+      POSTGRES_USER: dev_user
+      POSTGRES_PASSWORD: dev_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: nx-redis-local
+    ports:
+      - "6379:6379"
+
+volumes:
+  pg_data:
+```
+
+```bash
+# Spin down and remove volumes when finished
+docker compose -f docker-compose.dev.yml down -v
+```
+
+## Working with Feature Flags
+
+Nexium Media uses feature flags to decouple feature deployment from feature release, enabling trunk-based development and dark launches:
+
+```tsx
+// features/billing/components/PricingTable.tsx
+import { useFeatureFlag } from "@/hooks/useFeatureFlag";
+import { LegacyPricingGrid } from "./LegacyPricingGrid";
+import { ModernTierSelector } from "./ModernTierSelector";
+
+export function PricingTable() {
+  const isModernTierEnabled = useFeatureFlag("nx-billing-v2-selector");
+
+  if (isModernTierEnabled) {
+    return <ModernTierSelector />;
+  }
+
+  return <LegacyPricingGrid />;
+}
+```
+
+During local development, override feature flags using URL query parameters (e.g., `?override_flags=nx-billing-v2-selector:true`) or via the local developer settings tray.
+
+## Isolated Component Development with Storybook
+
+On design system repositories and shared UI libraries, we use Storybook to author and test components in isolation:
+
+```bash
+# Start isolated component workshop
+npm run storybook
+```
+
+Storybook runs at `http://localhost:6006`, providing an interactive sandbox for testing edge-case variants, long text strings, responsive viewports, and accessibility states without navigating through complex full-app routing flows.
+
+## Related
+
+- [Engineering Workflows Overview](/docs/development/frontend/workflows)
+- [Debugging Workflows Deep Dive](/docs/development/frontend/workflows/debugging)
+- [Build & Deployment Pipelines](/docs/development/frontend/workflows/build-and-deployment)
+- [Troubleshooting Runbook](/docs/development/frontend/workflows/troubleshooting)
+

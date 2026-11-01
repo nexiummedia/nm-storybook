@@ -1,0 +1,38 @@
+---
+title: "Pull Request"
+description: "Process for creating and managing pull requests."
+---
+
+# Pull Request Process
+
+<Callout type="tip">
+A well‑structured PR speeds up reviews and reduces back‑and‑forth.
+</Callout>
+
+## Steps
+
+1. **Push your feature branch** to GitHub.
+   ```bash
+   git push -u origin <your-branch>
+   ```
+2. **Open a Pull Request** on GitHub:
+   - Base: `develop` (or `main` for release branches).
+   - Compare: your feature branch.
+3. **Title & Description**
+   - Title follows the pattern `type(scope): short description` (see Commit Convention).
+   - Description should include:
+     - Summary of changes.
+     - Screenshots or GIFs for UI changes.
+     - Checklist of testing steps.
+     - Related issue links (`Closes #123`).
+4. **Add Reviewers** – at least one teammate with domain knowledge.
+5. **Address Review Feedback** – push new commits; the PR updates automatically.
+6. **Final Checks** – ensure CI passes, no lint errors, and all checks are green.
+7. **Merge** – follow the **Merging** guide.
+
+---
+
+### PR Template (auto‑filled)
+
+Create a file `.github/pull_request_template.md` with the following content (see the next section).
+

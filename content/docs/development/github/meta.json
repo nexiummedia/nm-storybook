@@ -1,0 +1,15 @@
+{
+  "title": "GitHub Workflow",
+  "description": "Guidelines for using Git and GitHub within the company.",
+  "pages": [
+    "index",
+    "getting-started",
+    "branch-naming",
+    "commit-convention",
+    "pull-request",
+    "code-review",
+    "merging",
+    "release-process",
+    "git-troubleshooting"
+  ]
+}

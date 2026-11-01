@@ -1,0 +1,203 @@
+---
+title: Installation & Tooling
+description: Comprehensive installation guide for Node.js, package managers, VS Code configurations, and Git SSH credentials.
+---
+
+A standardized developer machine setup ensures zero friction during onboarding and eliminates "works on my machine" inconsistencies across Nexium Media's distributed engineering teams.
+
+This guide provides step-by-step instructions for managing runtime versions, editor tooling, formatting contracts, and cryptographically verified Git setups.
+
+## Node.js Installation via Version Managers
+
+Directly installing Node.js via system binaries or installers is strictly prohibited on Nexium Media machines. Different client projects frequently demand distinct major or minor releases. Engineers must use a version manager.
+
+### Windows: `nvm-windows`
+
+1. Download the latest `nvm-setup.exe` from the [nvm-windows releases](https://github.com/coreybutler/nvm-windows/releases).
+2. Run the installer using an administrator command prompt.
+3. Verify installation and install the designated corporate LTS release:
+
+```powershell
+nvm version
+nvm install 20.12.0
+nvm use 20.12.0
+node -v # Should report v20.12.0
+```
+
+### macOS & Linux: `nvm` (Node Version Manager)
+
+1. Install `nvm` using curl:
+
+```bash
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+```
+
+2. Add the environment variables to your shell profile (`~/.zshrc` or `~/.bashrc`):
+
+```bash
+export NVM_DIR="$([ -z "${XDG_CONFIG_HOME-}" ] && printf %s "${HOME}/.nvm" || printf %s "${XDG_CONFIG_HOME}/nvm")"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+```
+
+3. Install and switch to the target LTS version:
+
+```bash
+nvm install 20.12.0
+nvm use 20.12.0
+nvm alias default 20.12.0
+```
+
+<Callout type="tip">
+Enable automatic version switching by adding an `.nvmrc` auto-switch hook in your shell configuration. When you `cd` into a project directory containing an `.nvmrc`, your shell will switch versions seamlessly.
+</Callout>
+
+## Package Manager Policy
+
+Nexium Media standardizes on **`npm`** as the default package manager for client Next.js applications, unless a repository explicitly specifies `pnpm` or `yarn` in its root `README.md` or `package.json` `packageManager` field.
+
+| Tool | Usage Status | Rationale |
+| :--- | :--- | :--- |
+| **npm** | **Standard** | Zero additional installation requirements; native CI/CD container compatibility; predictable `npm ci` behavior. |
+| **pnpm** | Approved for Monorepos | Utilized on complex multi-package repositories (e.g., Turborepo workspaces) for hard-link disk efficiency and strict dependency isolation. |
+| **yarn (v1/v4)** | Legacy / Specific Clients | Maintained only on dedicated client engagements that mandate Yarn Berry workspaces. |
+
+<Callout type="warning">
+Never commit mixed lockfiles. A repository must contain exactly one lockfile (`package-lock.json`, `pnpm-lock.yaml`, or `yarn.lock`). PRs introducing secondary lockfiles will be blocked automatically by CI.
+</Callout>
+
+## Global CLI Tools
+
+Keep global CLI installations minimal to avoid version drift between machines and CI runners. We permit only essential utility wrappers:
+
+```bash
+npm install -g corepack typescript eslint rimraf
+```
+
+Always rely on local project-scoped binaries executed through `npx` (e.g., `npx prettier --check .`) to guarantee exact version compatibility.
+
+## VS Code Environment Configuration
+
+Visual Studio Code is the designated primary IDE for frontend development at Nexium Media.
+
+### Mandatory Extensions
+
+Install the following extensions from the VS Code Marketplace:
+
+- **ESLint** (`dbaeumer.vscode-eslint`): Integrates workspace ESLint flat configs.
+- **Prettier - Code Formatter** (`esbenp.prettier-vscode`): Enforces company formatting.
+- **Tailwind CSS IntelliSense** (`bradlc.vscode-tailwindcss`): Autocompletion, linting, and class preview for Tailwind utility strings.
+- **TypeScript Hero** (`rbbit.typescript-hero`) or native TypeScript language features: Manages clean import sorting and organizing.
+
+### Workspace Settings (`.vscode/settings.json`)
+
+To ensure identical formatting and linting behaviors across all contributors, every Nexium Media project commits a `.vscode/settings.json` file:
+
+```json
+{
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit",
+    "source.organizeImports": "explicit"
+  },
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+  "tailwindCSS.experimental.classRegex": [
+    ["cva\\(([^)]*)\\)", "[\"'`]([^\"'`]*).*?[\"'`]"],
+    ["cn\\(([^)]*)\\)", "[\"'`]([^\"'`]*).*?[\"'`]"]
+  ],
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true
+}
+```
+
+## EditorConfig (`.editorconfig`)
+
+Nexium Media projects enforce cross-editor consistency via a root `.editorconfig` file:
+
+```ini
+root = true
+
+[*]
+indent_style = space
+indent_size = 2
+end_of_line = lf
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+[*.md]
+trim_trailing_whitespace = false
+
+[Makefile]
+indent_style = tab
+```
+
+## Git & SSH Key Configuration
+
+All commits pushed to Nexium Media repositories must be cryptographically signed and authenticated via SSH keys.
+
+### 1. Generating an Ed25519 SSH Key
+
+We mandate modern Ed25519 keys over legacy RSA:
+
+```bash
+ssh-keygen -t ed25519 -C "your.name@nexiummedia.com" -f ~/.ssh/id_ed25519_nexium
+```
+
+### 2. Configuring the SSH Agent
+
+Add the key to your SSH config file (`~/.ssh/config`):
+
+```text
+Host github.com
+  HostName github.com
+  User git
+  IdentityFile ~/.ssh/id_ed25519_nexium
+  IdentitiesOnly yes
+  AddKeysToAgent yes
+```
+
+Start the SSH agent and add your identity:
+
+```bash
+# Windows PowerShell
+Start-Service ssh-agent
+ssh-add ~/.ssh/id_ed25519_nexium
+
+# macOS / Linux
+eval "$(ssh-agent -s)"
+ssh-add ~/.ssh/id_ed25519_nexium
+```
+
+### 3. Register Key with GitHub Enterprise
+
+Copy your public key:
+
+```bash
+# macOS
+pbcopy < ~/.ssh/id_ed25519_nexium.pub
+
+# Windows PowerShell
+Get-Content ~/.ssh/id_ed25519_nexium.pub | Set-Clipboard
+
+# Linux
+xclip -selection clipboard < ~/.ssh/id_ed25519_nexium.pub
+```
+
+Navigate to **GitHub → Settings → SSH and GPG keys → New SSH key**. Enter a recognizable title (e.g., `MacBook Pro M3 Max - Nexium`) and paste the key.
+
+Verify the connection:
+
+```bash
+ssh -T git@github.com
+# Expected output: Hi <username>! You've successfully authenticated, but GitHub does not provide shell access.
+```
+
+## Related
+
+- [Getting Started Overview](/docs/development/frontend/getting-started)
+- [Development Environment Deep Dive](/docs/development/frontend/getting-started/development-environment)
+- [Project Setup Standards](/docs/development/frontend/getting-started/project-setup)
+- [Module Organization & Imports](/docs/development/frontend/project-structure/module-organization)

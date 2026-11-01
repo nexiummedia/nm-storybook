@@ -1,0 +1,6 @@
+{
+  "title": "Quality",
+  "description": "Accessibility standards, Web Vitals performance, modern SEO, security, and code review criteria.",
+  "pages": ["index", "accessibility", "performance", "seo", "security", "code-review"]
+}
+

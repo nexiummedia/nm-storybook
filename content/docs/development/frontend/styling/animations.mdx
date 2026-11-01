@@ -1,0 +1,192 @@
+---
+title: Animations & Micro-Interactions
+description: Animation principles, GPU-accelerated transitions, Framer Motion integration, skeleton loaders, and reduced-motion accessibility.
+---
+
+Animations elevate user interfaces from static pages to responsive, tactile experiences. When applied with intention, animations guide user focus, clarify cause-and-effect relationships, and mask asynchronous data latencies. When overused or poorly engineered, they trigger motion sickness, block user interaction, and cause high CPU utilization and dropped frames.
+
+This guide details our animation philosophy, CSS transition best practices, Framer Motion architectures, and accessibility mandates.
+
+## The Nexium Animation Philosophy
+
+1. **Purposeful**: Animations must serve a functional purpose—communicating state transitions, confirming user actions, or indicating loading. Purely decorative animations are discouraged.
+2. **Fast and Subdued**: Micro-interactions should complete within **150ms to 300ms**. Longer durations make interfaces feel sluggish.
+3. **Hardware Accelerated**: Animate only GPU-friendly compositor properties: `transform` and `opacity`. Never animate layout-triggering properties (`width`, `height`, `top`, `margin`, `padding`).
+4. **Accessible by Default**: Every animation must respect the operating system's `prefers-reduced-motion` setting.
+
+## Native CSS Transitions & Keyframes
+
+Use native CSS transitions for simple hover states, button presses, and loading spinners:
+
+### Tailwind Core Animation Utilities
+
+- `animate-spin`: Infinite continuous rotation for loading indicators.
+- `animate-pulse`: Gentle opacity oscillation for skeleton loading screens.
+- `transition-colors duration-150 ease-in-out`: Subtle color shifts on interactive buttons and links.
+
+### Declaring Custom Keyframes in `tailwind.config.ts`
+
+```typescript
+// tailwind.config.ts
+import type { Config } from "tailwindcss";
+
+const config: Config = {
+  theme: {
+    extend: {
+      keyframes: {
+        "fade-in-up": {
+          "0%": { opacity: "0", transform: "translateY(8px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+      },
+      animation: {
+        "fade-in-up": "fade-in-up 200ms cubic-bezier(0.16, 1, 0.3, 1)",
+      },
+    },
+  },
+};
+
+export default config;
+```
+
+## Advanced Gestures & Layouts: Framer Motion
+
+For complex physics-based springs, presence mount/unmount animations, and layout reordering, use **Framer Motion** (`framer-motion`):
+
+```bash
+npm install framer-motion
+```
+
+### 1. Mount & Unmount Transitions with `AnimatePresence`
+
+In React, conditionally removed DOM nodes vanish instantly. `AnimatePresence` allows exit animations to complete before unmounting:
+
+```tsx
+"use client";
+
+import { motion, AnimatePresence } from "framer-motion";
+
+export function NotificationBanner({ isVisible, message }: { isVisible: boolean; message: string }) {
+  return (
+    <AnimatePresence>
+      {isVisible && (
+        <motion.aside
+          initial={{ opacity: 0, y: -20, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: -20, scale: 0.95 }}
+          transition={{ duration: 0.2, ease: "easeOut" }}
+          className="rounded-md bg-blue-50 p-4 text-blue-900 shadow-md"
+        >
+          {message}
+        </motion.aside>
+      )}
+    </AnimatePresence>
+  );
+}
+```
+
+### 2. Smooth Layout Shifts with `layout` Prop
+
+Framer Motion's `layout` prop automatically calculates bounding client rects and animates sibling position shifts using efficient transforms (FLIP technique):
+
+```tsx
+"use client";
+
+import { useState } from "react";
+import { motion } from "framer-motion";
+
+export function FilterableList({ items }: { items: string[] }) {
+  return (
+    <ul className="space-y-2">
+      {items.map((item) => (
+        <motion.li
+          layout // Automatically animates smoothly when items are added, removed, or filtered
+          key={item}
+          className="rounded border p-3"
+        >
+          {item}
+        </motion.li>
+      ))}
+    </ul>
+  );
+}
+```
+
+## Skeleton Loading Screens
+
+Skeletons indicate where dynamic content will appear, preserving layout dimensions and preventing Cumulative Layout Shift (CLS):
+
+```tsx
+export function MetricCardSkeleton() {
+  return (
+    <div className="rounded-lg border border-slate-200 p-6 shadow-sm">
+      {/* Title placeholder */}
+      <div className="h-4 w-1/3 animate-pulse rounded bg-slate-200" />
+      {/* Large metric placeholder */}
+      <div className="mt-4 h-8 w-1/2 animate-pulse rounded bg-slate-200" />
+      {/* Subtext placeholder */}
+      <div className="mt-2 h-3 w-3/4 animate-pulse rounded bg-slate-200" />
+    </div>
+  );
+}
+```
+
+## Accessibility: `prefers-reduced-motion`
+
+Many users experience vestibular disorders or motion sickness from visual movement. Operating systems allow users to request reduced motion.
+
+### CSS Reduction via Tailwind `motion-reduce` Variant
+Tailwind provides the `motion-reduce:` prefix to disable or soften animations automatically:
+
+```tsx
+<div className="transition-transform duration-300 hover:scale-105 motion-reduce:transform-none motion-reduce:transition-none">
+  Hoverable Card
+</div>
+```
+
+### Framer Motion Reduction with `useReducedMotion`
+
+```tsx
+"use client";
+
+import { motion, useReducedMotion } from "framer-motion";
+
+export function AccessibleModal({ children }: { children: React.ReactNode }) {
+  const shouldReduceMotion = useReducedMotion();
+
+  // If user requested reduced motion, bypass translation and use subtle opacity only
+  const animationVariants = {
+    hidden: { opacity: 0, y: shouldReduceMotion ? 0 : 24 },
+    visible: { opacity: 1, y: 0 },
+  };
+
+  return (
+    <motion.div
+      initial="hidden"
+      animate="visible"
+      variants={animationVariants}
+      transition={{ duration: 0.15 }}
+    >
+      {children}
+    </motion.div>
+  );
+}
+```
+
+<Callout type="warning">
+Never animate properties that trigger browser layout reflow (such as `height: auto` to `height: 100%`). Doing so forces the browser to recalculate geometric positions of surrounding elements on every frame, causing noticeable stuttering. Always prefer `transform: scale()` or `opacity`.
+</Callout>
+
+## Common Mistakes & Anti-Patterns
+
+1. **Overly Long Durations**: Animations exceeding 400ms feel sluggish to users who interact with the app repeatedly throughout their workday. Keep durations between 150ms and 250ms.
+2. **Cascading Stagger Loops**: Staggering 50 items with 100ms delays causes the bottom items to take 5+ seconds to appear. Cap staggers to the first 5–8 items, or animate the container as a whole.
+3. **Ignoring Reduced Motion**: Deploying animated hero headers or layout transitions without a `prefers-reduced-motion` fallback violates WCAG 2.1 AA Criterion 2.3.3.
+
+## Related
+
+- [Styling Philosophy Overview](/docs/development/frontend/styling)
+- [Tailwind CSS Architecture](/docs/development/frontend/styling/tailwind-css)
+- [Performance Optimization](/docs/development/frontend/quality/performance)
+- [Accessibility Compliance Guide](/docs/development/frontend/quality/accessibility)
+

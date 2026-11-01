@@ -1,0 +1,207 @@
+---
+title: Integration Testing & MSW
+description: Multi-component integration testing, network-layer interception with Mock Service Worker (MSW), provider wrappers, and full feature flows.
+---
+
+While unit tests verify components in isolation, integration tests verify that multiple components, state management stores, and asynchronous network pipelines work together correctly. Mocking native `fetch` with `jest.fn()` throughout individual tests leads to fragile mock logic and poor test fidelity.
+
+Nexium Media standardizes on **Mock Service Worker (MSW v2)** to intercept network requests at the HTTP transport layer, providing realistic API simulation for both Node.js test runners and browser development environments.
+
+## Mock Service Worker (MSW v2) Architecture
+
+MSW intercepts network calls using standard Web Fetch API primitives (`http`, `HttpResponse`, `delay`):
+
+```text
+src/mocks/
+├── handlers.ts       # Shared route handlers and mock response payloads
+├── server.ts         # Node.js server instance for Jest / Vitest test runners
+└── browser.ts        # Service worker registration for browser development
+```
+
+### 1. Handler Definitions (`handlers.ts`)
+
+```typescript
+// src/mocks/handlers.ts
+import { http, HttpResponse, delay } from "msw";
+
+export const handlers = [
+  // Authenticate user endpoint
+  http.post("https://api.nexiummedia.com/v1/auth/login", async ({ request }) => {
+    const { email, password } = (await request.json()) as Record<string, string>;
+
+    if (email === "lead@nexiummedia.com" && password === "ValidPass123!") {
+      return HttpResponse.json({
+        user: { id: "usr-1", name: "Lead Engineer", email },
+        token: "mock-jwt-bearer-token",
+      });
+    }
+
+    return HttpResponse.json(
+      { message: "Invalid credentials provided." },
+      { status: 401 }
+    );
+  }),
+
+  // Fetch campaigns list endpoint
+  http.get("https://api.nexiummedia.com/v1/campaigns", async () => {
+    return HttpResponse.json([
+      { id: "c-1", name: "Q1 Brand Elevation", budget: 50000, status: "active" },
+      { id: "c-2", name: "Performance Retargeting", budget: 25000, status: "paused" },
+    ]);
+  }),
+];
+```
+
+### 2. Test Server Configuration (`server.ts`)
+
+```typescript
+// src/mocks/server.ts
+import { setupServer } from "msw/node";
+import { handlers } from "./handlers";
+
+export const server = setupServer(...handlers);
+```
+
+### 3. Global Jest Integration (`jest.setup.ts`)
+
+Configure MSW lifecycle hooks in `jest.setup.ts` to manage interceptors and reset handlers between tests:
+
+```typescript
+// jest.setup.ts
+import { server } from "./src/mocks/server";
+
+// Start intercepting before all tests run
+beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
+
+// Reset runtime request handlers between tests
+afterEach(() => server.resetHandlers());
+
+// Clean up after the test suite finishes
+afterAll(() => server.close());
+```
+
+<Callout type="tip">
+Setting `onUnhandledRequest: "error"` ensures that any unmocked HTTP calls made during tests fail immediately, preventing accidental leaks to live production or staging APIs.
+</Callout>
+
+## The `renderWithProviders` Utility
+
+Components that consume React Context, TanStack Query, or theme providers will crash if rendered without their required parent providers. Use a shared `renderWithProviders` helper:
+
+```tsx
+// test-utils/render-with-providers.tsx
+import * as React from "react";
+import { render, type RenderOptions } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
+interface CustomRenderOptions extends Omit<RenderOptions, "wrapper"> {
+  queryClient?: QueryClient;
+}
+
+export function renderWithProviders(
+  ui: React.ReactElement,
+  options?: CustomRenderOptions
+) {
+  const testQueryClient =
+    options?.queryClient ??
+    new QueryClient({
+      defaultOptions: {
+        queries: { retry: false, gcTime: 0 },
+        mutations: { retry: false },
+      },
+    });
+
+  function Wrapper({ children }: { children: React.ReactNode }) {
+    return (
+      <QueryClientProvider client={testQueryClient}>
+        {children}
+      </QueryClientProvider>
+    );
+  }
+
+  return {
+    ...render(ui, { wrapper: Wrapper, ...options }),
+    queryClient: testQueryClient,
+  };
+}
+```
+
+## Complete Feature Integration Test: Campaign Management Flow
+
+Below is an integration test covering the complete user flow for creating and viewing campaigns:
+
+```tsx
+// features/campaigns/CampaignManager.integration.test.tsx
+import * as React from "react";
+import { screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { http, HttpResponse } from "msw";
+import { server } from "@/mocks/server";
+import { renderWithProviders } from "@/test-utils/render-with-providers";
+import { CampaignDashboard } from "./components/CampaignDashboard";
+
+describe("Campaign Dashboard Feature Integration", () => {
+  it("fetches and displays campaigns, then adds a new campaign via form", async () => {
+    const user = userEvent.setup();
+
+    // 1. Initial Render with Providers
+    renderWithProviders(<CampaignDashboard />);
+
+    // 2. Verify Loading Skeleton appears, then data renders
+    expect(screen.getByTestId("loading-skeleton")).toBeInTheDocument();
+
+    const campaignHeading = await screen.findByText("Q1 Brand Elevation");
+    expect(campaignHeading).toBeInTheDocument();
+    expect(screen.getByText("$50,000")).toBeInTheDocument();
+
+    // 3. Mock POST handler for campaign creation
+    server.use(
+      http.post("https://api.nexiummedia.com/v1/campaigns", async ({ request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ id: "c-3", ...body, status: "active" }, { status: 201 });
+      })
+    );
+
+    // 4. Fill and submit creation form
+    await user.click(screen.getByRole("button", { name: /create new campaign/i }));
+    await user.type(screen.getByLabelText(/campaign title/i), "Enterprise Launch 2026");
+    await user.type(screen.getByLabelText(/allocated budget/i), "75000");
+    await user.click(screen.getByRole("button", { name: /publish campaign/i }));
+
+    // 5. Assert toast notification and optimistic UI update
+    await waitFor(() => {
+      expect(screen.getByText("Enterprise Launch 2026")).toBeInTheDocument();
+    });
+    expect(screen.getByRole("status")).toHaveTextContent(/campaign published successfully/i);
+  });
+
+  it("gracefully displays error alert when the server returns 500 error", async () => {
+    // Override handler to simulate a server crash
+    server.use(
+      http.get("https://api.nexiummedia.com/v1/campaigns", () => {
+        return new HttpResponse(null, { status: 500 });
+      })
+    );
+
+    renderWithProviders(<CampaignDashboard />);
+
+    const errorAlert = await screen.findByRole("alert");
+    expect(errorAlert).toHaveTextContent(/failed to load campaigns from server/i);
+    expect(screen.getByRole("button", { name: /try again/i })).toBeInTheDocument();
+  });
+});
+```
+
+## Common Integration Pitfalls
+
+1. **Reusing Query Clients Between Tests**: Sharing a single `QueryClient` instance causes cached query data from one test to pollute subsequent tests. Always instantiate a fresh `new QueryClient({ defaultOptions: { queries: { gcTime: 0 } } })` inside `renderWithProviders`.
+2. **Hardcoded URLs That Do Not Match**: MSW requires handler URLs to match the requested endpoint exactly. Use shared constants (`API_BASE_URL`) in both your API client and your MSW handlers.
+3. **Not Awaiting DOM Updates**: Asserting on elements before MSW network responses resolve triggers false test failures. Always use `findBy*` or `waitFor()`.
+
+## Related
+
+- [Testing Architecture Overview](/docs/development/frontend/testing)
+- [Unit Testing Standards](/docs/development/frontend/testing/unit-testing)
+- [End-to-End Testing with Playwright](/docs/development/frontend/testing/end-to-end-testing)
+- [Data Fetching & Server Cache](/docs/development/frontend/state-and-data/data-fetching)
+

@@ -1,0 +1,224 @@
+---
+title: Accessibility Compliance (WCAG 2.1 AA)
+description: Comprehensive accessibility engineering guide, keyboard focus navigation, ARIA semantics, color contrast, and automated a11y testing.
+---
+
+Accessibility (a11y) is a core engineering requirement for all Nexium Media deliverables. Building accessible applications ensures our products are usable by everyone, including people who rely on screen readers, keyboard-only navigation, screen magnifiers, or voice input. Compliance with **WCAG 2.1 AA** is legally mandated across our enterprise and public-sector client engagements.
+
+This guide provides actionable technical standards for semantic structure, keyboard navigation, dialog focus traps, dynamic live regions, and automated test integration.
+
+## The Four Principles of WCAG (POUR)
+
+Every accessible interface must satisfy the four core principles of the Web Content Accessibility Guidelines:
+
+1. **Perceivable**: Information and user interface components must be presentable to users in ways they can perceive (e.g., text alternatives for non-text content, adaptable layout, sufficient color contrast).
+2. **Operable**: Interface components and navigation must be operable via diverse input methods (e.g., keyboard access, sufficient time to interact, zero seizure-inducing flashes).
+3. **Understandable**: Information and operation of the user interface must be clear and predictable (e.g., readable text, predictable form layouts, clear input assistance).
+4. **Robust**: Content must be robust enough to be interpreted reliably by a wide variety of user agents, including assistive technologies.
+
+## Semantic HTML Audit Checklist
+
+| Requirement | Correct Implementation | Prohibited Anti-Pattern |
+| :--- | :--- | :--- |
+| **Document Landmarks** | Exactly one `<main>`, accompanied by `<header>`, `<nav>`, `<footer>`. | Replacing document landmarks with generic `<div>` wrappers. |
+| **Heading Hierarchy** | Logical progression (`<h1>` → `<h2>` → `<h3>`) without skipping levels. | Jumping from `<h1>` directly to `<h4>` for visual styling. |
+| **Interactive Buttons** | Native `<button>` elements with clear, descriptive accessible names. | Clickable `<div onClick={...}>` without keyboard handlers or ARIA roles. |
+| **Descriptive Links** | Hyperlinks that describe the destination (`<a href="/pricing">View Enterprise Pricing</a>`). | Links that read "Click here" or "Read more". |
+| **Image Alternatives** | Informational images have descriptive `alt`; decorative images use `alt=""`. | Omitted `alt` attributes or `alt="image"`. |
+
+## Keyboard Focus Navigation & Focus Traps
+
+All interactive experiences must be completely usable without a mouse.
+
+### Skip Navigation Link
+Every layout must provide a skip link as the very first focusable element, allowing keyboard users to bypass repetitive navigation menus:
+
+```tsx
+// components/layout/SkipToContent.tsx
+export function SkipToContent() {
+  return (
+    <a
+      href="#main-content"
+      className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50 focus:rounded-md focus:bg-blue-600 focus:px-4 focus:py-2 focus:text-white focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-white"
+    >
+      Skip to main content
+    </a>
+  );
+}
+```
+
+### Visible Focus Indicators (`:focus-visible`)
+
+Never disable focus outlines without providing an accessible alternative:
+
+```css
+/* Anti-Pattern: Strips focus indicator, leaving keyboard users lost */
+button:focus {
+  outline: none;
+}
+
+/* Best Practice: High-contrast visible focus rings for keyboard users */
+button:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+```
+
+### Focus Management in Modals & Dialogs
+
+When a modal dialog opens:
+1. Keyboard focus must move inside the dialog immediately.
+2. Focus must be **trapped** inside the dialog (Tab and Shift+Tab loop within the dialog).
+3. Pressing `Escape` must close the dialog.
+4. When the dialog closes, focus must return to the element that triggered it.
+
+Nexium Media uses Radix UI primitives (`@radix-ui/react-dialog`), which manage focus traps, ARIA roles, and keyboard listeners automatically:
+
+```tsx
+import * as Dialog from "@radix-ui/react-dialog";
+
+export function AccessibleModal() {
+  return (
+    <Dialog.Root>
+      <Dialog.Trigger asChild>
+        <button className="btn-primary">Open Settings</button>
+      </Dialog.Trigger>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 bg-black/50 backdrop-blur-sm" />
+        <Dialog.Content
+          aria-describedby="dialog-desc"
+          className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-lg bg-white p-6 shadow-xl"
+        >
+          <Dialog.Title className="text-lg font-bold">Account Settings</Dialog.Title>
+          <Dialog.Description id="dialog-desc" className="text-sm text-slate-500">
+            Adjust your profile preferences and notification channels.
+          </Dialog.Description>
+          {/* Focus remains trapped inside these interactive elements */}
+          <input placeholder="Display Name" className="border p-2 mt-4" />
+          <Dialog.Close asChild>
+            <button className="mt-4 btn-secondary">Close</button>
+          </Dialog.Close>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+}
+```
+
+## Color Contrast Ratios
+
+Under WCAG 2.1 AA, text must maintain sufficient contrast against its background:
+
+- **Normal Text** (below 18pt / 24px, or below 14pt / 18.5px bold): **Minimum 4.5:1** contrast ratio.
+- **Large Text** (at least 18pt / 24px, or 14pt / 18.5px bold): **Minimum 3:1** contrast ratio.
+- **UI Components and Graphical Objects** (form field borders, icons, focus rings): **Minimum 3:1** contrast ratio.
+
+<Callout type="warning">
+Never use color alone to convey meaning (such as showing red text without an accompanying icon or text label to indicate an error). Colorblind users cannot distinguish status changes that rely solely on hue shifts.
+</Callout>
+
+## Accessible Data Tables
+
+Tables presenting tabular data must declare explicit row and column headers:
+
+```html
+<table class="data-table">
+  <caption>Quarterly Marketing Spend by Channel (USD)</caption>
+  <thead>
+    <tr>
+      <th scope="col">Marketing Channel</th>
+      <th scope="col">Q1 Budget</th>
+      <th scope="col">Q2 Budget</th>
+      <th scope="col">Status</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th scope="row">Paid Search (PPC)</th>
+      <td>$45,000</td>
+      <td>$60,000</td>
+      <td>Active</td>
+    </tr>
+  </tbody>
+</table>
+```
+
+## Dynamic Live Regions: `aria-live`
+
+When content updates dynamically without a full page reload (e.g., new chat messages, notification toasts, search results counts), screen readers must be informed:
+
+```tsx
+export function SearchResultsCount({ count, isSearching }: { count: number; isSearching: boolean }) {
+  return (
+    <div
+      aria-live="polite"     // Announces update when user is idle
+      aria-atomic="true"     // Reads entire message rather than just changed numbers
+      className="text-sm text-slate-500"
+    >
+      {isSearching ? "Searching catalog..." : `${count} products found`}
+    </div>
+  );
+}
+```
+
+Use `aria-live="assertive"` sparingly, reserved exclusively for critical, time-sensitive system alerts (e.g., "Your session will expire in 60 seconds").
+
+## Screen Reader Testing Procedures
+
+Automated tools catch only 30% to 50% of accessibility issues. Manual screen reader audits are mandatory before every client release:
+
+### macOS: VoiceOver
+- **Toggle VoiceOver**: `Cmd + F5`
+- **VoiceOver Modifier**: `Control + Option` (referred to as `VO`)
+- **Navigate DOM**: `VO + Left Arrow` / `VO + Right Arrow`
+- **Open Rotor (Landmarks/Headings/Links)**: `VO + U`
+
+### Windows: NVDA (NonVisual Desktop Access)
+- **Toggle NVDA**: `Ctrl + Alt + N`
+- **Browse Mode Navigation**: `H` (next heading), `K` (next link), `F` (next form field)
+- **Elements List**: `NVDA + F7`
+
+## Automated Accessibility Testing
+
+### 1. Component Unit Tests with `jest-axe`
+
+```tsx
+// components/ui/Button.test.tsx
+import * as React from "react";
+import { render } from "@testing-library/react";
+import { axe, toHaveNoViolations } from "jest-axe";
+import { Button } from "./Button";
+
+expect.extend(toHaveNoViolations);
+
+it("has zero accessibility violations", async () => {
+  const { container } = render(<Button variant="primary">Submit Application</Button>);
+  const results = await axe(container);
+  expect(results).toHaveNoViolations();
+});
+```
+
+### 2. End-to-End Page Scans with Playwright + Axe
+
+```typescript
+// __tests__/e2e/accessibility.spec.ts
+import { test, expect } from "@playwright/test";
+import AxeBuilder from "@axe-core/playwright";
+
+test("home page meets WCAG 2.1 AA accessibility standards", async ({ page }) => {
+  await page.goto("/");
+  const accessibilityScanResults = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+    .analyze();
+
+  expect(accessibilityScanResults.violations).toEqual([]);
+});
+```
+
+## Related
+
+- [Quality Standards Overview](/docs/development/frontend/quality)
+- [HTML & Semantic CSS Architecture](/docs/development/frontend/fundamentals/html-css)
+- [Component Library (shadcn/Radix)](/docs/development/frontend/ui-components/component-library)
+- [Code Review Checklist](/docs/development/frontend/quality/code-review)
+

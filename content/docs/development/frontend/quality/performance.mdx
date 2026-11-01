@@ -1,0 +1,184 @@
+---
+title: Performance Optimization & Web Vitals
+description: Core Web Vitals optimization, Next.js bundle minimization, asset loading strategies, and production performance budgets.
+---
+
+Web performance directly impacts conversion rates, user engagement, and search engine rankings. A 100ms delay in page load time can reduce conversion rates by 7%. In modern JavaScript applications, performance degradation is rarely caused by a single bottleneck; it results from the accumulation of unoptimized image assets, oversized third-party script bundles, uncontrolled re-renders, and unexpected layout shifts.
+
+This guide details our technical benchmarks for Google's Core Web Vitals, bundle analysis workflows, asset optimization pipelines, and performance budgets.
+
+## Core Web Vitals Thresholds & SLA
+
+Nexium Media mandates that all production client deliverables achieve "Good" ratings on Google Core Web Vitals across both mobile and desktop viewports:
+
+| Metric | Full Name | What It Measures | Good Threshold | Needs Improvement | Poor |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **LCP** | Largest Contentful Paint | Perceived loading speed; render time of largest above-the-fold image or text block. | **&le; 2.5s** | 2.5s – 4.0s | &gt; 4.0s |
+| **INP** | Interaction to Next Paint | Responsiveness to user input (clicking, tapping, typing); replaces FID. | **&le; 200ms** | 200ms – 500ms | &gt; 500ms |
+| **CLS** | Cumulative Layout Shift | Visual stability; measures unexpected layout shifts of visible elements. | **&le; 0.1** | 0.1 – 0.25 | &gt; 0.25 |
+
+## Measuring & Monitoring Core Web Vitals
+
+1. **Synthetic Lab Audits**: Run Chrome DevTools Lighthouse or WebPageTest with simulated network throttling (Mobile Fast 4G / 4x CPU slowdown).
+2. **Real User Monitoring (RUM)**: Collect live user telemetry using the official `web-vitals` library:
+
+```typescript
+// app/vitals.ts
+"use client";
+
+import { useReportWebVitals } from "next/web-vitals";
+
+export function WebVitalsReporter() {
+  useReportWebVitals((metric) => {
+    // Transmit to internal telemetry endpoint or Google Analytics
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon("/api/telemetry/vitals", JSON.stringify(metric));
+    }
+  });
+
+  return null;
+}
+```
+
+## Image Optimization with `next/image`
+
+Images account for over 60% of average page weight. Always use `next/image` to serve modern AVIF and WebP formats automatically:
+
+```tsx
+import Image from "next/image";
+
+export function HeroSection() {
+  return (
+    <div className="relative h-[500px] w-full overflow-hidden">
+      <Image
+        src="/assets/hero-banner.jpg"
+        alt="Nexium Media global engineering summit keynote"
+        fill
+        priority // Preloads image to optimize Largest Contentful Paint (LCP)
+        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 75vw, 1200px"
+        placeholder="blur"
+        blurDataURL="data:image/svg+xml;base64,..."
+        className="object-cover"
+      />
+    </div>
+  );
+}
+```
+
+### Rules of `next/image`
+- **Always specify `sizes`**: Without the `sizes` attribute, the browser downloads full-resolution desktop images even on mobile viewports.
+- **Mark the LCP Element with `priority`**: Set `priority` on the single largest above-the-fold image to preload it in the document `<head>`.
+- **Never mark below-the-fold images with `priority`**: Images below the fold must lazy-load naturally to avoid competing for initial network bandwidth.
+
+## Eliminating Layout Shifts (Zero CLS)
+
+Layout shifts occur when elements are injected into the DOM without reserved space, shifting content below them:
+
+```tsx
+// Anti-Pattern: Content pops in and pushes content down
+{showAdBanner && <div className="h-60 bg-yellow-100">Sponsored Ad</div>}
+
+// Best Practice: Reserve layout space with min-height or aspect-ratio
+<div className="min-h-[240px] w-full bg-slate-50">
+  {showAdBanner ? <div className="h-60 bg-yellow-100">Sponsored Ad</div> : null}
+</div>
+```
+
+- **Set Explicit Dimensions**: Always specify `width` and `height` attributes on SVG icons and images to let the browser compute the aspect ratio before assets load.
+- **Font Face Swapping**: Use `next/font` with `display: "swap"` and automatic fallback font metrics to prevent layout shifts when custom web fonts finish downloading.
+
+## JavaScript Bundle Optimization & Auditing
+
+A heavy JavaScript bundle directly degrades **Interaction to Next Paint (INP)** by blocking the browser main thread during parsing and execution.
+
+### Analyzing Bundle Composition with Next.js Bundle Analyzer
+
+```bash
+npm install -D @next/bundle-analyzer
+```
+
+```javascript
+// next.config.ts
+import withBundleAnalyzer from "@next/bundle-analyzer";
+
+const bundleAnalyzer = withBundleAnalyzer({
+  enabled: process.env.ANALYZE === "true",
+});
+
+export default bundleAnalyzer({
+  // Next.js configuration...
+});
+```
+
+Execute a bundle audit:
+```bash
+ANALYZE=true npm run build
+```
+
+Inspect the generated treemap visualization. If any single third-party library accounts for more than 50kB of your bundle, investigate tree-shaking alternatives:
+
+```typescript
+// Anti-Pattern: Imports entire lodash library (72kB gzipped)
+import _ from "lodash";
+const result = _.cloneDeep(data);
+
+// Best Practice: Import specific function or use native structuredClone
+import cloneDeep from "lodash/cloneDeep";
+// Even better: Native web standard (0kB bundle impact)
+const result = structuredClone(data);
+```
+
+## Third-Party Script Optimization: `next/script`
+
+Third-party tracking scripts (Google Tag Manager, Segment, Hotjar) can severely degrade performance if loaded synchronously. Manage them with `next/script`:
+
+```tsx
+import Script from "next/script";
+
+export function AnalyticsScripts() {
+  return (
+    <>
+      {/* 1. Critical scripts needed before interactive (e.g., bot detection) */}
+      <Script
+        src="https://challenges.cloudflare.com/turnstile/v0/api.js"
+        strategy="beforeInteractive"
+      />
+
+      {/* 2. Standard analytics: loads immediately after page becomes interactive */}
+      <Script
+        src="https://www.googletagmanager.com/gtag/js?id=G-XXXXX"
+        strategy="afterInteractive"
+      />
+
+      {/* 3. Non-critical feedback widgets: loads during browser idle time */}
+      <Script
+        src="https://widget.intercom.io/widget/APP_ID"
+        strategy="lazyOnload"
+      />
+    </>
+  );
+}
+```
+
+## The Nexium Performance Budget
+
+Every production release must satisfy our team performance budget:
+
+| Budget Metric | Hard Limit | Enforcement Point |
+| :--- | :--- | :--- |
+| **Initial Client JS Chunk** | **&lt; 150 KB** (gzipped) | Monitored via CI build size checks. |
+| **Total Route JS Execution** | **&lt; 350 KB** (gzipped) | Monitored via CI build size checks. |
+| **Font Payload** | **&lt; 50 KB** (WOFF2 format) | Self-hosted via `next/font`. |
+| **Lighthouse Performance Score** | **&ge; 90 / 100** | Enforced by Lighthouse CI in GitHub Actions. |
+
+<Callout type="tip">
+Move heavy business logic, markdown compilation, and database queries to React Server Components whenever possible. Code executed inside Server Components produces **zero** client JavaScript bundle overhead.
+</Callout>
+
+## Related
+
+- [Quality Standards Overview](/docs/development/frontend/quality)
+- [Next.js App Router Architecture](/docs/development/frontend/fundamentals/nextjs)
+- [Animations & Micro-Interactions](/docs/development/frontend/styling/animations)
+- [Debugging Performance & Profiling](/docs/development/frontend/workflows/debugging)
+
