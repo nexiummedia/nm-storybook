@@ -1,0 +1,148 @@
+---
+title: Express Routing Architecture
+description: Modular domain routing with express.Router(), asynchronous error wrapping, type-safe route parameters, and route registration.
+---
+
+Routing connects incoming HTTP request methods and URI paths to their corresponding controller handlers. At Nexium Media, routes are strictly structured into domain-specific modules.
+
+---
+
+## 1. Modular Routing with `express.Router()`
+
+Never attach routes directly to `app` in multiple files. Group endpoints by domain inside `src/routes/` and export a configured router:
+
+```text
+src/routes/
+ ├── index.ts          # Aggregate router combining all domain routes
+ ├── auth.routes.ts    # /api/v1/auth
+ ├── user.routes.ts    # /api/v1/users
+ └── order.routes.ts   # /api/v1/orders
+```
+
+### The Aggregate Router (`src/routes/index.ts`)
+
+```ts title="src/routes/index.ts"
+import { Router } from 'express';
+import { authRouter } from './auth.routes.js';
+import { userRouter } from './user.routes.js';
+import { orderRouter } from './order.routes.js';
+
+export const appRouter = Router();
+
+appRouter.use('/auth', authRouter);
+appRouter.use('/users', userRouter);
+appRouter.use('/orders', orderRouter);
+```
+
+---
+
+## 2. Safe Async Route Handler Wrapper (`asyncHandler`)
+
+Express 4 does not automatically catch rejected Promises in async route handlers. If an uncaught promise rejection occurs without an explicit `try/catch` or wrapper, the request hangs or crashes the Node.js event loop.
+
+We implement an `asyncHandler` higher-order utility that intercepts rejected promises and forwards them to `next(err)`:
+
+```ts title="src/utils/asyncHandler.ts"
+import { Request, Response, NextFunction, RequestHandler } from 'express';
+
+type AsyncRequestHandler = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => Promise<unknown>;
+
+export const asyncHandler = (fn: AsyncRequestHandler): RequestHandler => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    Promise.resolve(fn(req, res, next)).catch(next);
+  };
+};
+```
+
+<Callout type="tip">
+Wrapping route handlers with `asyncHandler` eliminates repetitive `try/catch (error) { next(error); }` blocks across your controllers, keeping controller logic clean and focused.
+</Callout>
+
+---
+
+## 3. Domain Router Implementation Example
+
+Here is a complete, type-safe router implementation for User resources:
+
+```ts title="src/routes/user.routes.ts"
+import { Router } from 'express';
+import { UserController } from '../controllers/user.controller.js';
+import { UserService } from '../services/user.service.js';
+import { PrismaUserRepository } from '../repositories/user.repository.js';
+import { prisma } from '../config/database.js';
+import { requireAuth } from '../middleware/auth.middleware.js';
+import { requireRole } from '../middleware/rbac.middleware.js';
+import { validateRequest } from '../middleware/validate.middleware.js';
+import { createUserSchema, updateUserSchema, userQuerySchema } from '../validators/user.validator.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
+
+export const userRouter = Router();
+
+// Dependency composition for the user domain
+const userRepository = new PrismaUserRepository(prisma);
+const userService = new UserService(userRepository);
+const userController = new UserController(userService);
+
+// Route: Collection root (/api/v1/users)
+userRouter
+  .route('/')
+  .get(
+    requireAuth,
+    requireRole(['ADMIN', 'MANAGER']),
+    validateRequest({ query: userQuerySchema }),
+    asyncHandler(userController.listUsers)
+  )
+  .post(
+    requireAuth,
+    requireRole(['ADMIN']),
+    validateRequest({ body: createUserSchema }),
+    asyncHandler(userController.createUser)
+  );
+
+// Route: Singular item by ID (/api/v1/users/:userId)
+userRouter
+  .route('/:userId')
+  .get(
+    requireAuth,
+    asyncHandler(userController.getUserById)
+  )
+  .patch(
+    requireAuth,
+    validateRequest({ body: updateUserSchema }),
+    asyncHandler(userController.updateUser)
+  )
+  .delete(
+    requireAuth,
+    requireRole(['ADMIN']),
+    asyncHandler(userController.deleteUser)
+  );
+```
+
+---
+
+## 4. Route Method Chaining
+
+Notice the use of `router.route('/path').get(...).post(...)` above. Method chaining prevents path string duplication and groups all operations for a specific resource target in a single block.
+
+---
+
+## 5. Common Routing Anti-Patterns
+
+<Callout type="warning">
+**Avoid These Common Pitfalls**:
+1. **Missing `next()` in Custom Middleware**: If your custom route middleware fails to call `next()` when checks pass, the client request will hang until timeout.
+2. **Duplicate Route Paths**: Registering `/users/:id` before `/users/export` will capture the string `"export"` as the `:id` parameter. Always register specific/static routes before parameterized wildcard routes.
+3. **Double Response Delivery**: Sending `res.json(...)` followed by code that later invokes `res.status(...).json(...)` triggers `ERR_HTTP_HEADERS_SENT`. Always `return` after sending responses if subsequent code exists.
+</Callout>
+
+---
+
+## Related
+
+- [Controllers & Services](/docs/development/backend/node-express/controllers-services)
+- [Middleware Implementation Patterns](/docs/development/backend/node-express/middleware)
+- [Request Validation with Zod](/docs/development/backend/api-development/request-validation)

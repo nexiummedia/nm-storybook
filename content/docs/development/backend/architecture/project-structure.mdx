@@ -1,0 +1,98 @@
+---
+title: Backend Project Structure Standards
+description: Exhaustive directory contracts, file responsibilities, and boundary rules for Node.js Express and Python FastAPI codebases.
+---
+
+Clean architecture begins with disciplined directory organization. This document establishes the exact folder responsibilities for all backend services at Nexium Media.
+
+---
+
+## 1. Node.js / Express Annotated Structure
+
+Every TypeScript Express backend repository follows this exact structure under `src/`:
+
+```
+src/
+ ├─ index.ts          # App entry, server bootstrap, port binding, shutdown hooks
+ ├─ app.ts            # Express app setup, top-level middleware, route mounting
+ ├─ config/           # Environment validation with Zod, typed config export
+ ├─ routes/           # Route definitions only (thin URL wrappers)
+ ├─ controllers/      # Request unpacking, response formatting, status codes
+ ├─ services/         # Business logic (strictly no Express req/res knowledge)
+ ├─ repositories/     # Database access (Prisma / Mongoose queries only)
+ ├─ middleware/       # Auth, rate limiting, request ID, error handling
+ ├─ validators/       # Zod schemas for request bodies, query params, path params
+ ├─ types/            # Shared TypeScript interfaces & declaration merging
+ └─ utils/            # Pure stateless utility functions
+```
+
+### Directory Responsibilities Matrix (Node.js)
+
+| Directory | What Belongs Here | What Strictly Does NOT Belong Here |
+| :--- | :--- | :--- |
+| `src/config/` | Zod schema parsing `process.env`, exported frozen config object. | Business logic, HTTP code, database connections. |
+| `src/routes/` | `Router()` instances, HTTP verbs, URL paths, middleware attachment. | Business logic, direct DB calls, SQL/Prisma code, response formatting. |
+| `src/controllers/` | Extracting typed params/body, calling service methods, sending HTTP status and payload. | Database queries, complex domain calculations, raw SQL, password hashing. |
+| `src/services/` | Business rules, domain validation, coordinating multiple repositories, sending emails/events. | `req`, `res`, `next` objects, HTTP status codes, raw SQL queries. |
+| `src/repositories/` | Direct database operations (`prisma.user.findUnique`, raw SQL), aggregation pipelines. | HTTP concepts, business authorization, email sending, request validation. |
+| `src/middleware/` | Pre-processing requests (JWT verification, rate limit checking, CORS, request logging). | Domain business logic, permanent state mutation outside request context. |
+| `src/validators/` | Zod schema definitions (`createUserSchema`, `updateUserSchema`). | Database queries, route registration, response formatting. |
+| `src/types/` | TypeScript interfaces, type aliases, Express declaration merging (`req.user`). | Runtime executable code, function definitions. |
+| `src/utils/` | Stateless pure functions (e.g., date math, slug generators, crypto hashers). | Side-effecting database calls, network I/O, domain logic. |
+
+---
+
+## 2. Python / FastAPI Annotated Structure
+
+Every Python FastAPI backend codebase organizes domain logic inside `app/`:
+
+```
+app/
+ ├─ main.py           # FastAPI app instance, lifespan context, router aggregation
+ ├─ config.py         # Pydantic Settings class, .env validation
+ ├─ routers/          # APIRouter definitions by domain (/users, /auth, /billing)
+ ├─ controllers/      # Request coordination layer (optional thin orchestration)
+ ├─ services/         # Pure business logic (no FastAPI or HTTP dependencies)
+ ├─ repositories/     # SQLAlchemy AsyncSession queries, database operations
+ ├─ models/           # SQLAlchemy DeclarativeBase ORM models
+ ├─ schemas/          # Pydantic request/response schemas (DTOs)
+ ├─ dependencies/     # FastAPI Depends() providers (db session, current user)
+ ├─ middleware/       # Starlette / ASGI middlewares (logging, timing, CORS)
+ └─ utils/            # Pure stateless helper functions (jwt helpers, hashing)
+```
+
+### Directory Responsibilities Matrix (Python)
+
+| Directory | What Belongs Here | What Strictly Does NOT Belong Here |
+| :--- | :--- | :--- |
+| `app/config.py` | `pydantic_settings.BaseSettings` subclass reading `.env`. | Database connection instantiation, endpoint logic. |
+| `app/routers/` | `APIRouter()` declarations, path parameters, dependency injections (`Depends()`). | Direct DB queries, raw SQL, multi-step business logic. |
+| `app/schemas/` | Pydantic v2 `BaseModel` classes defining API request and response contracts. | SQLAlchemy ORM definitions, database sessions. |
+| `app/models/` | SQLAlchemy `DeclarativeBase` ORM model classes mapping tables and relationships. | Pydantic validation rules, HTTP response schemas. |
+| `app/services/` | Core business workflows, domain validation, third-party API orchestrations. | `Request`, `Response`, `HTTPException` directly (use custom domain exceptions). |
+| `app/repositories/` | Async SQLAlchemy queries (`select`, `insert`, `update`), database transactions. | HTTP parameters, schema conversions, presentation formatting. |
+| `app/dependencies/` | Callable providers for `Depends()`: DB session yields, user JWT extraction. | Route declarations, ORM model definitions. |
+| `app/middleware/` | ASGI middleware for correlation IDs, access logging, response timing headers. | Business logic, domain data manipulation. |
+
+---
+
+## 3. Directory Invariants & Code Review Checklist
+
+During pull request reviews, the following structural violations are immediate blockers:
+
+<Callout type="error">
+**Architectural Invariant Violations**:
+1. **Repository Bypass**: A controller or router directly importing Prisma or SQLAlchemy to run queries without a Repository.
+2. **HTTP Leaking into Services**: A Service importing `express.Request`, `express.Response`, or raising raw HTTP 400/500 exceptions instead of typed domain errors.
+3. **ORM Model Leakage in API Responses**: Returning raw SQLAlchemy or Prisma model instances directly to the client instead of passing them through a validated DTO / Pydantic response schema.
+4. **Scattered Environment Lookups**: Calling `process.env.VARIABLE` or `os.getenv("VARIABLE")` arbitrarily inside service or repository files rather than injecting from `@config` or `app.config`.
+</Callout>
+
+---
+
+## Related
+
+- [Layered Architecture In-Depth](/docs/development/backend/architecture/layered-architecture)
+- [REST API Design Standards](/docs/development/backend/architecture/api-design)
+- [Express Middleware Pipeline](/docs/development/backend/node-express/middleware)
+- [FastAPI Dependency Injection](/docs/development/backend/python-fastapi/dependency-injection)

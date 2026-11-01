@@ -1,0 +1,12 @@
+{
+  "title": "Python & FastAPI",
+  "pages": [
+    "index",
+    "fastapi-fundamentals",
+    "routing-and-endpoints",
+    "pydantic-models",
+    "dependency-injection",
+    "async-programming",
+    "error-handling"
+  ]
+}

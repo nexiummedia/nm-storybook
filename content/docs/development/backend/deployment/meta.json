@@ -1,0 +1,9 @@
+{
+  "title": "Deployment & DevOps",
+  "pages": [
+    "index",
+    "environment-config",
+    "docker",
+    "ci-cd"
+  ]
+}

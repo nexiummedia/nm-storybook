@@ -1,0 +1,169 @@
+---
+title: Environment Configuration
+description: Managing environment tiers, configuration validation, graceful shutdown hooks, and configuration architecture across Express and FastAPI services.
+---
+
+# Environment Configuration
+
+The **12-Factor App methodology** dictates strict separation of code and configuration. At Nexium Media, configuration is defined as anything that is likely to vary between deploys (development, staging, production, disaster recovery).
+
+---
+
+## 1. Environment Tiers
+
+Nexium Media standardizes on three operational tiers:
+
+| Tier | Purpose | Database Strategy | Logging Verbosity |
+| :--- | :--- | :--- | :--- |
+| **Development (`development`)** | Local developer workstation, rapid iterations. | Local Docker PostgreSQL/MongoDB containers. | `debug` with pretty-printed console colors. |
+| **Staging (`staging`)** | Pre-production testing, QA validation, client UAT. | Isolated cloud database populated with sanitized test seeds. | `info` with structured JSON output. |
+| **Production (`production`)** | Live customer traffic, critical business processes. | Multi-AZ High Availability managed database with automated replicas. | `warn` & `error` with structured JSON, distributed tracing IDs. |
+
+---
+
+## 2. Standard Environment Variable Keys
+
+All environment variables follow uppercase snake_case (`SCREAMING_SNAKE_CASE`):
+
+```bash
+# Core Runtime
+NODE_ENV=production          # or ENVIRONMENT=production for Python
+PORT=4000                    # or 8000
+API_PREFIX=/api/v1
+LOG_LEVEL=info
+
+# Database & Cache
+DATABASE_URL=postgresql://user:password@rds-host:5432/dbname?sslmode=require
+REDIS_URL=rediss://default:password@redis-cluster:6379
+
+# Security & CORS
+JWT_SECRET_KEY=secure_long_random_entropy_key_here
+ALLOWED_ORIGINS=https://app.nexiummedia.com,https://admin.nexiummedia.com
+
+# External Integrations
+RAZORPAY_KEY_ID=rzp_live_xxx
+RAZORPAY_KEY_SECRET=rzp_live_secret_xxx
+AWS_S3_BUCKET=nexium-production-assets
+AWS_REGION=ap-south-1
+```
+
+---
+
+## 3. Graceful Shutdown Implementation
+
+During container deployment, orchestrators like Kubernetes issue a `SIGTERM` signal to the process before forcefully issuing `SIGKILL` after a termination grace period (typically 30 seconds). Unhandled termination results in severed client connections and incomplete database writes.
+
+### Node.js / Express Graceful Termination
+
+```ts title="src/server.ts"
+import http from 'http';
+import app from './app';
+import { prisma } from './lib/prisma';
+import { logger } from './utils/logger';
+
+const PORT = process.env.PORT || 4000;
+const server = http.createServer(app);
+
+server.listen(PORT, () => {
+  logger.info(`🚀 Server running on port ${PORT} in ${process.env.NODE_ENV} mode`);
+});
+
+const handleShutdown = async (signal: string) => {
+  logger.info(`Received ${signal}. Initiating graceful shutdown...`);
+
+  // 1. Stop receiving new connections
+  server.close(async (err) => {
+    if (err) {
+      logger.error('Error during HTTP server shutdown:', err);
+      process.exit(1);
+    }
+
+    try {
+      // 2. Close active database connection pool
+      await prisma.$disconnect();
+      logger.info('Database connection pool closed successfully.');
+
+      logger.info('Graceful shutdown complete. Exiting process.');
+      process.exit(0);
+    } catch (dbErr) {
+      logger.error('Error closing database connections:', dbErr);
+      process.exit(1);
+    }
+  });
+
+  // Force close after 15 seconds if drain hangs
+  setTimeout(() => {
+    logger.error('Graceful shutdown timeout exceeded. Forcing termination.');
+    process.exit(1);
+  }, 15000);
+};
+
+process.on('SIGTERM', () => handleShutdown('SIGTERM'));
+process.on('SIGINT', () => handleShutdown('SIGINT'));
+```
+
+### Python / FastAPI Lifespan Context
+
+```python title="app/main.py"
+import asyncio
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
+from app.core.database import engine
+from app.core.logger import logger
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup Sequence
+    logger.info("Initializing database connection pool...")
+    # Verify DB connectivity
+    async with engine.begin() as conn:
+        logger.info("Database connection established successfully.")
+    
+    yield  # Application processes requests here
+    
+    # Shutdown Sequence
+    logger.info("SIGTERM/SIGINT received. Disposing database engine...")
+    await engine.dispose()
+    logger.info("Database connection pool cleanly closed.")
+
+app = FastAPI(title="Nexium Media API", lifespan=lifespan)
+```
+
+---
+
+## 4. Health Check Probes for Orchestrators
+
+Every service exposes two dedicated endpoints for platform orchestrators:
+
+1. `GET /health/live` (Liveness Probe): Returns `200 OK` as long as the process is alive. If this fails, the orchestrator restarts the pod.
+2. `GET /health/ready` (Readiness Probe): Verifies that dependencies (Database, Redis) are responding. If this fails, traffic is temporarily diverted without terminating the pod.
+
+```ts title="src/routes/health.ts"
+import { Router } from 'express';
+import { prisma } from '../lib/prisma';
+
+export const healthRouter = Router();
+
+healthRouter.get('/live', (req, res) => {
+  res.status(200).json({ status: 'live' });
+});
+
+healthRouter.get('/ready', async (req, res) => {
+  try {
+    // Ping database with lightweight query
+    await prisma.$queryRaw`SELECT 1`;
+    res.status(200).json({ status: 'ready', database: 'connected' });
+  } catch (err) {
+    res.status(503).json({ status: 'unready', database: 'disconnected' });
+  }
+});
+```
+
+---
+
+## Related
+
+- [Secrets Management Policies](/docs/development/backend/security/secrets-management)
+- [Docker Containerization](/docs/development/backend/deployment/docker)
+- [CI/CD Pipelines](/docs/development/backend/deployment/ci-cd)
+

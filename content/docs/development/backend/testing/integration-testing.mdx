@@ -1,0 +1,170 @@
+---
+title: "API Integration Testing: Supertest & HTTPX"
+description: Testing real HTTP endpoints with Supertest (Express) and AsyncClient (FastAPI) against real PostgreSQL database instances.
+---
+
+Integration tests exercise the full backend stack: middleware pipelines, routing, schema validation, dependency injection, and live database queries. They provide the highest confidence before shipping code to production.
+
+---
+
+## 1. Integration Testing Philosophy
+
+- **Real Database Instances**: Never mock the database in integration tests. Use a dedicated PostgreSQL test container (`testcontainers` or Docker Compose service). SQLite behaves differently from PostgreSQL regarding JSONB, array types, and concurrent locking.
+- **Transaction Rollback per Test**: Wrap each test execution in a database transaction that is rolled back after assertion, leaving the database perfectly clean for the next test.
+
+---
+
+## 2. Node.js Implementation: Supertest + Express
+
+### 1. Test Setup & JWT Helper
+
+```ts title="tests/integration/setup.ts"
+import jwt from 'jsonwebtoken';
+import { prisma } from '@/config/database.js';
+import { config } from '@/config/index.js';
+
+export const createTestUserAndToken = async (role = 'USER') => {
+  const user = await prisma.user.create({
+    data: {
+      email: `test_${Date.now()}@nexiummedia.com`,
+      fullName: 'Integration User',
+      passwordHash: 'dummy_hash',
+      role: role as any,
+    },
+  });
+
+  const token = jwt.sign(
+    { userId: user.id, email: user.email, role: user.role },
+    config.JWT_ACCESS_SECRET,
+    { expiresIn: '1h' }
+  );
+
+  return { user, token };
+};
+```
+
+### 2. Full Flow Test: Users API
+
+```ts title="tests/integration/user.test.ts"
+import request from 'supertest';
+import { app } from '@/app.js';
+import { prisma } from '@/config/database.js';
+import { createTestUserAndToken } from './setup.js';
+
+describe('Users API End-to-End Flow (/api/v1/users)', () => {
+  let authToken: string;
+  let testUserId: string;
+
+  beforeAll(async () => {
+    const { token, user } = await createTestUserAndToken('ADMIN');
+    authToken = token;
+    testUserId = user.id;
+  });
+
+  afterAll(async () => {
+    // Clean up test data
+    await prisma.user.deleteMany({
+      where: { email: { contains: 'test_' } },
+    });
+    await prisma.$disconnect();
+  });
+
+  it('GET /api/v1/users - returns 401 without authorization header', async () => {
+    const res = await request(app).get('/api/v1/users');
+    expect(res.status).toBe(401);
+    expect(res.body.error.code).toBe('UNAUTHORIZED');
+  });
+
+  it('GET /api/v1/users - lists paginated users with valid token', async () => {
+    const res = await request(app)
+      .get('/api/v1/users?page=1&pageSize=10')
+      .set('Authorization', `Bearer ${authToken}`);
+
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data)).toBe(true);
+    expect(res.body.meta.pagination.page).toBe(1);
+    expect(res.headers['x-request-id']).toBeDefined();
+  });
+
+  it('PATCH /api/v1/users/:id - updates user profile', async () => {
+    const res = await request(app)
+      .patch(`/api/v1/users/${testUserId}`)
+      .set('Authorization', `Bearer ${authToken}`)
+      .send({ fullName: 'Updated Integration Name' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.fullName).toBe('Updated Integration Name');
+  });
+});
+```
+
+---
+
+## 3. Python Implementation: FastAPI & `httpx.AsyncClient`
+
+FastAPI integration tests use HTTPX's asynchronous ASGI client:
+
+```python title="tests/integration/test_auth_flow.py"
+import pytest
+from httpx import AsyncClient, ASGITransport
+from app.main import app
+
+@pytest.mark.asyncio
+async def test_full_registration_and_login_flow(test_db):
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        # 1. Register a new user
+        register_payload = {
+            "email": "integration_test@nexiummedia.com",
+            "password": "SecurePassword123!",
+            "full_name": "Integration Tester",
+        }
+        reg_response = await client.post("/api/v1/auth/register", json=register_payload)
+        assert reg_response.status_code == 201
+        user_id = reg_response.json()["data"]["id"]
+
+        # 2. Login to acquire JWT access token
+        login_payload = {
+            "username": "integration_test@nexiummedia.com",
+            "password": "SecurePassword123!",
+        }
+        login_response = await client.post("/api/v1/auth/token", data=login_payload)
+        assert login_response.status_code == 200
+        token = login_response.json()["access_token"]
+
+        # 3. Access protected route with Bearer token
+        headers = {"Authorization": f"Bearer {token}"}
+        profile_response = await client.get("/api/v1/users/me", headers=headers)
+        assert profile_response.status_code == 200
+        assert profile_response.json()["data"]["id"] == user_id
+```
+
+---
+
+## 4. Running Integration Tests in CI Pipelines
+
+In GitHub Actions, spin up a dedicated ephemeral PostgreSQL service container for the duration of the integration test job:
+
+```yaml title=".github/workflows/integration.yml"
+services:
+  postgres:
+    image: postgres:16-alpine
+    env:
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_password
+      POSTGRES_DB: nm_test_db
+    ports:
+      - 5432:5432
+    options: >-
+      --health-cmd pg_isready
+      --health-interval 10s
+      --health-timeout 5s
+      --health-retries 5
+```
+
+---
+
+## Related
+
+- [Unit Testing Node.js with Jest](/docs/development/backend/testing/unit-testing-node)
+- [Unit Testing Python with Pytest](/docs/development/backend/testing/unit-testing-python)
+- [CI/CD Pipelines & GitHub Actions](/docs/development/backend/deployment/ci-cd)

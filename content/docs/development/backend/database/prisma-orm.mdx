@@ -1,0 +1,239 @@
+---
+title: Prisma ORM for Node.js
+description: Declarative schema modeling, end-to-end type safety, relational queries, interactive transactions, and client extensions.
+---
+
+Prisma is Nexium Media's standard ORM for Node.js. It replaces manual SQL mapping with declarative schema modeling, automatic TypeScript type generation, and a type-safe query client.
+
+---
+
+## 1. Schema Modeling (`schema.prisma`)
+
+All entity definitions, enums, and database relations reside in `prisma/schema.prisma`:
+
+```prisma title="prisma/schema.prisma"
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextSearch"]
+}
+
+enum Role {
+  USER
+  MANAGER
+  ADMIN
+}
+
+enum PostStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  fullName     String    @map("full_name")
+  passwordHash String    @map("password_hash")
+  role         Role      @default(USER)
+  isActive     Boolean   @default(true) @map("is_active")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  posts        Post[]
+  profile      Profile?
+
+  @@map("users")
+}
+
+model Profile {
+  id        String   @id @default(uuid())
+  userId    String   @unique @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bio       String?
+  avatarUrl String?  @map("avatar_url")
+
+  @@map("profiles")
+}
+
+model Post {
+  id        String     @id @default(uuid())
+  title     String
+  slug      String     @unique
+  content   String
+  status    PostStatus @default(DRAFT)
+  authorId  String     @map("author_id")
+  author    User       @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
+
+  @@index([authorId])
+  @@index([status, createdAt(sort: Desc)])
+  @@map("posts")
+}
+```
+
+<Callout type="tip">
+Always map camelCase TypeScript properties to snake_case database columns using `@map("column_name")` and `@@map("table_name")`. This keeps PostgreSQL schemas idiomatic while maintaining TypeScript JavaScript conventions.
+</Callout>
+
+---
+
+## 2. Core CRUD Operations
+
+Instantiate the Prisma Client singleton:
+
+```ts title="src/config/database.ts"
+import { PrismaClient } from '@prisma/client';
+import { config } from './index.js';
+
+export const prisma = new PrismaClient({
+  log: config.NODE_ENV === 'development' ? ['query', 'warn', 'error'] : ['error'],
+});
+```
+
+### Type-Safe Queries
+
+```ts
+// 1. Create with nested relation write
+const newUser = await prisma.user.create({
+  data: {
+    email: 'sarah@nexiummedia.com',
+    fullName: 'Sarah Connor',
+    passwordHash: 'hashed_secret',
+    profile: {
+      create: {
+        bio: 'Backend Tech Lead',
+      },
+    },
+  },
+  include: { profile: true },
+});
+
+// 2. Read with select (avoids SELECT * and hides passwordHash)
+const user = await prisma.user.findUnique({
+  where: { email: 'sarah@nexiummedia.com' },
+  select: {
+    id: true,
+    email: true,
+    fullName: true,
+    role: true,
+  },
+});
+
+// 3. Update with atomic counters or upsert
+const updatedUser = await prisma.user.upsert({
+  where: { email: 'sarah@nexiummedia.com' },
+  update: { fullName: 'Sarah Connor (Senior Lead)' },
+  create: {
+    email: 'sarah@nexiummedia.com',
+    fullName: 'Sarah Connor',
+    passwordHash: 'default_hash',
+  },
+});
+
+// 4. Delete
+await prisma.post.delete({
+  where: { id: 'post_123' },
+});
+```
+
+---
+
+## 3. Relational Filtering & Complex Queries
+
+Prisma provides rich filtering operators:
+
+```ts
+const publishedPosts = await prisma.post.findMany({
+  where: {
+    status: 'PUBLISHED',
+    AND: [
+      { createdAt: { gte: new Date('2026-01-01') } },
+      {
+        OR: [
+          { title: { contains: 'TypeScript', mode: 'insensitive' } },
+          { content: { contains: 'Express', mode: 'insensitive' } },
+        ],
+      },
+    ],
+  },
+  orderBy: { createdAt: 'desc' },
+  take: 20,
+});
+```
+
+---
+
+## 4. Transactions: Sequential vs. Interactive
+
+### Sequential Batch `$transaction([...])`
+Use array transactions for atomic multi-statement operations without dependency between queries:
+```ts
+const [deletedCount, postCount] = await prisma.$transaction([
+  prisma.post.deleteMany({ where: { authorId: userId } }),
+  prisma.user.delete({ where: { id: userId } }),
+]);
+```
+
+### Interactive `$transaction(async (tx) => ...)`
+Use interactive transactions when subsequent queries depend upon the results of preceding operations:
+```ts
+const transferResult = await prisma.$transaction(async (tx) => {
+  // 1. Decrement sender balance
+  const sender = await tx.account.update({
+    where: { id: senderId },
+    data: { balance: { decrement: amount } },
+  });
+
+  if (sender.balance < 0) {
+    throw new Error('Insufficient balance to complete transfer');
+  }
+
+  // 2. Increment receiver balance
+  const receiver = await tx.account.update({
+    where: { id: receiverId },
+    data: { balance: { increment: amount } },
+  });
+
+  // 3. Create audit transaction log
+  return tx.transferAudit.create({
+    data: { fromId: senderId, toId: receiverId, amount },
+  });
+});
+```
+
+---
+
+## 5. Essential Prisma CLI Commands
+
+```bash
+# 1. Update generated TypeScript client types after editing schema.prisma
+npx prisma generate
+
+# 2. Create and apply a migration during local development
+npx prisma migrate dev --name add_posts_table
+
+# 3. Apply pending migrations in production / CI environments
+npx prisma migrate deploy
+
+# 4. Check migration synchronization status
+npx prisma migrate status
+
+# 5. Open visual GUI to inspect database records
+npx prisma studio
+```
+
+---
+
+## Related
+
+- [PostgreSQL Production Architecture](/docs/development/backend/database/postgresql)
+- [Database Migrations Lifecycle](/docs/development/backend/database/migrations)
+- [Query Optimization Techniques](/docs/development/backend/database/query-optimization)

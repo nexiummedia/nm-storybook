@@ -1,0 +1,205 @@
+---
+title: Unit Testing Node.js Backends with Jest
+description: Jest configuration, TypeScript ts-jest integration, repository mocking, Zod schema testing, and async assertions.
+---
+
+Unit tests verify small, isolated units of logic (services, utilities, and validators) in complete isolation from databases, file systems, and network I/O.
+
+---
+
+## 1. Jest & TypeScript Configuration
+
+Configure Jest for TypeScript using `ts-jest` and path alias resolution:
+
+```ts title="jest.config.ts"
+import type { Config } from 'jest';
+
+const config: Config = {
+  preset: 'ts-jest/presets/default-esm',
+  testEnvironment: 'node',
+  roots: ['<rootDir>/tests/unit'],
+  moduleNameMapper: {
+    '^@/(.*)$': '<rootDir>/src/$1',
+    '^(\\.{1,2}/.*)\\.js$': '$1', // Handle ESM import extensions
+  },
+  transform: {
+    '^.+\\.tsx?$': [
+      'ts-jest',
+      {
+        useESM: true,
+      },
+    ],
+  },
+  collectCoverageFrom: [
+    'src/services/**/*.ts',
+    'src/validators/**/*.ts',
+    'src/utils/**/*.ts',
+    '!src/**/*.d.ts',
+  ],
+  coverageThreshold: {
+    global: {
+      branches: 80,
+      functions: 85,
+      lines: 85,
+      statements: 85,
+    },
+  },
+};
+
+export default config;
+```
+
+---
+
+## 2. Test Fixture Factories
+
+Avoid duplicating mock database objects across tests. Use factory functions to produce clean, strongly-typed fixtures:
+
+```ts title="tests/fixtures/user.fixture.ts"
+import { User, Role } from '@prisma/client';
+
+export const createMockUser = (overrides?: Partial<User>): User => ({
+  id: 'usr_8b91a27e-3c22-48f5-93df-f4460d3d5f19',
+  email: 'test@nexiummedia.com',
+  fullName: 'Test Developer',
+  passwordHash: '$2b$12$e8x/samplehashedpassword',
+  role: Role.USER,
+  isActive: true,
+  createdAt: new Date('2026-01-01T00:00:00Z'),
+  updatedAt: new Date('2026-01-01T00:00:00Z'),
+  ...overrides,
+});
+```
+
+---
+
+## 3. Testing a Service Class with Mocked Repositories
+
+Because our layered architecture utilizes constructor dependency injection, testing services is completely decoupled from Prisma:
+
+```ts title="tests/unit/services/user.service.test.ts"
+import { UserService } from '@/services/user.service.js';
+import { IUserRepository } from '@/repositories/user.repository.js';
+import { AppError } from '@/utils/appError.js';
+import { createMockUser } from '../../fixtures/user.fixture.js';
+import bcrypt from 'bcrypt';
+
+jest.mock('bcrypt');
+
+describe('UserService', () => {
+  let mockUserRepo: jest.Mocked<IUserRepository>;
+  let userService: UserService;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+
+    mockUserRepo = {
+      findById: jest.fn(),
+      findByEmail: jest.fn(),
+      create: jest.fn(),
+      updateStatus: jest.fn(),
+    };
+
+    userService = new UserService(mockUserRepo);
+  });
+
+  describe('registerUser', () => {
+    it('successfully hashes password and persists new user', async () => {
+      // 1. Arrange
+      mockUserRepo.findByEmail.mockResolvedValueOnce(null);
+      (bcrypt.hash as jest.Mock).mockResolvedValueOnce('mocked_hash_value');
+
+      const mockCreatedUser = createMockUser({ email: 'new@nexiummedia.com' });
+      mockUserRepo.create.mockResolvedValueOnce(mockCreatedUser);
+
+      // 2. Act
+      const result = await userService.registerUser({
+        email: 'new@nexiummedia.com',
+        password: 'Password123!',
+        fullName: 'New User',
+      });
+
+      // 3. Assert
+      expect(mockUserRepo.findByEmail).toHaveBeenCalledWith('new@nexiummedia.com');
+      expect(bcrypt.hash).toHaveBeenCalledWith('Password123!', 12);
+      expect(mockUserRepo.create).toHaveBeenCalledWith({
+        email: 'new@nexiummedia.com',
+        passwordHash: 'mocked_hash_value',
+        fullName: 'New User',
+      });
+      expect(result.id).toBe(mockCreatedUser.id);
+      expect(result.email).toBe('new@nexiummedia.com');
+      expect((result as any).passwordHash).toBeUndefined(); // Verify password hash is omitted
+    });
+
+    it('throws AppError(409) if email is already registered', async () => {
+      mockUserRepo.findByEmail.mockResolvedValueOnce(createMockUser());
+
+      await expect(
+        userService.registerUser({
+          email: 'test@nexiummedia.com',
+          password: 'Password123!',
+          fullName: 'Test User',
+        })
+      ).rejects.toThrow(AppError);
+
+      expect(mockUserRepo.create).not.toHaveBeenCalled();
+    });
+  });
+});
+```
+
+---
+
+## 4. Testing Zod Validators
+
+Validators are pure functions that test boundaries and edge cases:
+
+```ts title="tests/unit/validators/user.validator.test.ts"
+import { createUserSchema } from '@/validators/user.validator.js';
+
+describe('createUserSchema', () => {
+  it('passes with valid inputs and normalizes email', () => {
+    const validData = {
+      email: '  ALEX@NEXIUMMEDIA.COM  ',
+      password: 'StrongPassword123!',
+      fullName: 'Alex Chen',
+    };
+
+    const parsed = createUserSchema.parse(validData);
+    expect(parsed.email).toBe('alex@nexiummedia.com'); // Verifies trimming and lowercase
+  });
+
+  it('fails if password is fewer than 8 characters', () => {
+    const invalidData = {
+      email: 'alex@nexiummedia.com',
+      password: 'short',
+      fullName: 'Alex Chen',
+    };
+
+    const result = createUserSchema.safeParse(invalidData);
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0]?.path).toEqual(['password']);
+    }
+  });
+});
+```
+
+---
+
+## Common Mistakes in Node.js Unit Testing
+
+<Callout type="warning">
+1. **Testing Implementation Details Instead of Behavior**: Don't assert internal local variable names; assert function inputs, outputs, and collaborator calls.
+2. **Forgetting `await` on Async Assertions**: Writing `expect(promise).rejects.toThrow()` without `await` causes tests to pass silently even if the promise fails to reject!
+3. **Leaking Mocks Between Tests**: Always invoke `jest.clearAllMocks()` in `beforeEach` to reset invocation counts and stubbed implementations.
+</Callout>
+
+---
+
+## Related
+
+- [Controllers & Services](/docs/development/backend/node-express/controllers-services)
+- [Integration Testing with Supertest](/docs/development/backend/testing/integration-testing)
+- [Request Validation with Zod](/docs/development/backend/api-development/request-validation)

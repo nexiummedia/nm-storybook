@@ -1,0 +1,106 @@
+---
+title: Practical REST Conventions & Query Protocol
+description: Practical implementation of REST standards, URL resource modeling, filtering, multi-field sorting, search, and sparse fieldsets.
+---
+
+This guide defines the practical query string parameters and endpoint structures expected across all Nexium Media RESTful services.
+
+---
+
+## 1. Resource Modeling & URI Patterns
+
+Every API path addresses either a **collection** or a **singular resource instance**:
+
+| Endpoint Pattern | Method | Purpose | HTTP Status | Response Payload |
+| :--- | :--- | :--- | :--- | :--- |
+| `/api/v1/projects` | `GET` | List projects (with pagination & filter) | `200 OK` | `[ { project }, ... ]` |
+| `/api/v1/projects` | `POST` | Create a new project | `201 Created` | `{ new_project }` |
+| `/api/v1/projects/:id` | `GET` | Fetch single project by ID | `200 OK` | `{ project }` |
+| `/api/v1/projects/:id` | `PATCH` | Partially update project fields | `200 OK` | `{ updated_project }` |
+| `/api/v1/projects/:id` | `DELETE` | Delete or soft-delete project | `204 No Content` | *Empty body* |
+| `/api/v1/projects/:id/members` | `GET` | Sub-collection of project members | `200 OK` | `[ { member }, ... ]` |
+
+---
+
+## 2. Standardized Query Parameters
+
+To maintain consistency across client codebases, our backends enforce identical query parameter keys:
+
+### 1. Filtering by Attribute
+Use exact field names matching entity attributes:
+```http
+GET /api/v1/invoices?status=PAID&currency=USD
+```
+Support multiple values via comma separation or array repetition:
+```http
+GET /api/v1/invoices?status=PAID,PENDING
+```
+
+### 2. Multi-Field Sorting (`sort`)
+Sort fields are formatted as `fieldName:direction`. Multiple sort criteria are separated by commas:
+```http
+# Sort by created_at descending, then title ascending
+GET /api/v1/articles?sort=createdAt:desc,title:asc
+```
+
+### 3. Full-Text Search (`q`)
+Reserve `q` for full-text keyword search:
+```http
+GET /api/v1/products?q=wireless+noise+cancelling
+```
+
+### 4. Sparse Fieldsets (`fields`)
+Allow clients to request only specific attributes to reduce JSON serialization overhead:
+```http
+GET /api/v1/users?fields=id,email,fullName
+```
+
+---
+
+## 3. Node.js Query Parser Implementation
+
+Parse standardized query parameters safely with Zod:
+
+```ts title="src/validators/query.validator.ts"
+import { z } from 'zod';
+
+export const standardQuerySchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  pageSize: z.coerce.number().int().positive().max(100).default(20),
+  sort: z
+    .string()
+    .default('createdAt:desc')
+    .transform((val) => {
+      const [field, dir] = val.split(':');
+      return { [field]: dir === 'asc' ? 'asc' : 'desc' };
+    }),
+  q: z.string().optional(),
+  fields: z
+    .string()
+    .optional()
+    .transform((val) => val?.split(',').map((f) => f.trim())),
+});
+```
+
+---
+
+## 4. API Versioning Strategy
+
+Nexium Media enforces **URI Path Versioning** (`/api/v1/`, `/api/v2/`).
+
+### Why Path Versioning?
+- **Explicit Visibility**: Clear at a glance in browser DevTools, API gateways, and server logs.
+- **Cache Compatibility**: Easy URL-based edge caching without complex `Vary: Accept-Version` header coordination.
+- **Backward Compatibility**: Allows running v1 and v2 routes simultaneously during client migration periods.
+
+<Callout type="note">
+Minor, non-breaking changes (such as adding a new optional field to a response) do **not** warrant a version bump. Major versions are incremented only for breaking contract changes (renaming fields, removing endpoints, or altering required payload structures).
+</Callout>
+
+---
+
+## Related
+
+- [Request Validation Standards](/docs/development/backend/api-development/request-validation)
+- [Pagination Implementation](/docs/development/backend/api-development/pagination)
+- [Response Standards & Envelopes](/docs/development/backend/api-development/response-standards)

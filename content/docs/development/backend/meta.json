@@ -1,10 +1,17 @@
 {
-  "title": "Backend",
-  "description": "Backend services, APIs, and authentication mechanics",
+  "title": "Backend Engineering",
   "pages": [
     "index",
-    "api-structure",
-    "authentication"
+    "getting-started",
+    "architecture",
+    "node-express",
+    "python-fastapi",
+    "database",
+    "authentication",
+    "api-development",
+    "integrations",
+    "testing",
+    "security",
+    "deployment"
   ]
 }
-

@@ -1,0 +1,10 @@
+{
+  "title": "Third-Party Integrations",
+  "pages": [
+    "index",
+    "payment-gateways",
+    "email-services",
+    "file-storage",
+    "webhooks"
+  ]
+}

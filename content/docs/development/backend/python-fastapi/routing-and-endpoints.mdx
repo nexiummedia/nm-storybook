@@ -1,0 +1,138 @@
+---
+title: FastAPI Routing & Endpoints
+description: Modular APIRouter hierarchies, router-level security dependencies, strict path/query validation, and OpenAPI documentation tagging.
+---
+
+FastAPI decomposes complex API domains using `APIRouter`. Modular routers enable scoped prefixes, common authentication dependencies, and domain isolation.
+
+---
+
+## 1. Modular `APIRouter` Architecture
+
+Domain routes live inside `app/routers/` and are aggregated in `app/routers/__init__.py`:
+
+```python title="app/routers/__init__.py"
+from fastapi import APIRouter
+from app.routers.auth import router as auth_router
+from app.routers.users import router as users_router
+from app.routers.orders import router as orders_router
+
+api_router = APIRouter()
+
+api_router.include_router(auth_router)
+api_router.include_router(users_router)
+api_router.include_router(orders_router)
+```
+
+In `app/main.py`:
+```python
+from app.routers import api_router
+
+app.include_router(api_router, prefix="/api/v1")
+```
+
+---
+
+## 2. Router-Level Dependencies for Guarding Domains
+
+Instead of repeating `Depends(require_admin)` on every single endpoint in an admin router, attach the dependency at the `APIRouter` declaration:
+
+```python title="app/routers/admin.py"
+from fastapi import APIRouter, Depends
+from app.dependencies.auth import require_role
+
+# Every endpoint registered to admin_router now requires the ADMIN role!
+admin_router = APIRouter(
+    prefix="/admin",
+    tags=["Admin Management"],
+    dependencies=[Depends(require_role(["ADMIN"]))],
+    responses={403: {"description": "Forbidden - Admin access required"}},
+)
+
+@admin_router.get("/metrics")
+async def get_system_metrics():
+    return {"status": "healthy", "cpu_load": "12%"}
+```
+
+---
+
+## 3. Path Parameter Types & Validation
+
+FastAPI leverages standard Python types and `Path(...)` metadata to validate variables in the URI path:
+
+```python
+from uuid import UUID
+from fastapi import APIRouter, Path
+
+router = APIRouter()
+
+@router.get("/tenants/{tenant_id}/users/{user_id}")
+async def get_tenant_user(
+    tenant_id: str = Path(
+        ...,
+        min_length=4,
+        max_length=20,
+        regex="^[a-z0-9_-]+$",
+        description="Tenant slug identifier"
+    ),
+    user_id: UUID = Path(
+        ...,
+        description="Globally unique user identifier"
+    ),
+):
+    return {"tenant_id": tenant_id, "user_id": user_id}
+```
+
+If a client sends an invalid UUID (e.g. `/tenants/acme/users/not-a-uuid`), FastAPI automatically halts execution and returns a structured `422 Unprocessable Entity` before calling the handler.
+
+---
+
+## 4. Query Parameter Validation with `Query(...)`
+
+Validate and document search parameters:
+
+```python
+from typing import List, Optional
+from fastapi import APIRouter, Query
+
+router = APIRouter()
+
+@router.get("/catalog")
+async def search_catalog(
+    q: Optional[str] = Query(default=None, min_length=2, max_length=50),
+    page: int = Query(default=1, ge=1, description="Page number"),
+    page_size: int = Query(default=20, ge=1, le=100, description="Items per page"),
+    tags: List[str] = Query(default=[], description="Filter by multiple tags: ?tags=red&tags=blue"),
+    sort: str = Query(default="created_at:desc", regex="^(created_at|price):(asc|desc)$"),
+):
+    return {"query": q, "page": page, "page_size": page_size, "tags": tags, "sort": sort}
+```
+
+---
+
+## 5. Dependency vs Parameter: When to Use Each
+
+| Mechanism | Purpose | Examples |
+| :--- | :--- | :--- |
+| **Path / Query Parameter** | Value supplied directly by the client in the URI. | `user_id`, `page`, `page_size`, `filter_status`. |
+| **Request Body Schema** | JSON payload passed in the HTTP request body. | `UserCreateSchema`, `CheckoutPayload`. |
+| **`Depends()` Dependency** | Contextual dependencies resolved server-side. | Database session (`get_db`), Authenticated user (`get_current_user`), Permissions (`require_role`), External HTTP client. |
+
+---
+
+## 6. Common Routing Mistakes
+
+<Callout type="warning">
+**Avoid These Common FastAPI Routing Mistakes**:
+1. **Omitting `response_model`**: Returning a SQLAlchemy ORM model directly without `response_model=UserResponse` will leak private columns (e.g. `password_hash`) to the client.
+2. **Path Collisions**: Defining `@router.get("/users/{user_id}")` before `@router.get("/users/me")`. FastAPI matches routes in order of definition; `"me"` will be treated as the `user_id` value and fail UUID conversion! Always declare static paths before dynamic parameter paths.
+3. **Sync Handlers with Blocking Code**: Using `def` instead of `async def` or running blocking CPU-heavy operations inside `async def` without thread-pool offloading.
+</Callout>
+
+---
+
+## Related
+
+- [FastAPI Fundamentals](/docs/development/backend/python-fastapi/fastapi-fundamentals)
+- [Pydantic v2 Models & Schemas](/docs/development/backend/python-fastapi/pydantic-models)
+- [Dependency Injection Pattern](/docs/development/backend/python-fastapi/dependency-injection)

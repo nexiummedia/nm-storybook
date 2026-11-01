@@ -1,0 +1,292 @@
+---
+title: Node.js & TypeScript Environment Setup
+description: Production-grade tooling, TypeScript configuration, code quality automation, and environment handling for Node.js services at Nexium Media.
+---
+
+This guide defines the baseline toolchain required for building enterprise Express.js microservices with strict TypeScript at Nexium Media.
+
+---
+
+## 1. Node.js Runtime & Version Management
+
+All Nexium Media backend repositories must enforce active LTS releases (Node.js 20 LTS or Node.js 22 LTS). Version drift between engineers and production containers is strictly mitigated using `.nvmrc`.
+
+### Managing Versions with `nvm`
+
+```bash
+# Install Node.js 20 LTS
+nvm install 20
+
+# Use Node.js 20 LTS
+nvm use 20
+
+# Verify installation
+node -v   # v20.x.x
+npm -v    # 10.x.x
+```
+
+Commit an `.nvmrc` file at the root of the repository:
+
+```text title=".nvmrc"
+20
+```
+
+Add an `engines` declaration to `package.json` to reject unsupported runtimes during deployment:
+
+```json title="package.json"
+{
+  "engines": {
+    "node": ">=20.0.0 <23.0.0",
+    "npm": ">=10.0.0"
+  }
+}
+```
+
+---
+
+## 2. TypeScript Compiler Configuration
+
+Our backend repositories operate under **strict mode** with modern ECMAScript target outputs (`ES2022`). This ensures modern syntax compatibility (e.g., class private fields, top-level await, error causes) while generating clean JavaScript.
+
+Initialize and customize `tsconfig.json`:
+
+```json title="tsconfig.json"
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2022"],
+    "outDir": "./dist",
+    "rootDir": "./src",
+    
+    /* Strict Type-Checking Options */
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+    "noImplicitThis": true,
+    "alwaysStrict": true,
+
+    /* Additional Quality Checks */
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+
+    /* Module Resolution & Interop */
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+
+    /* Path Aliasing */
+    "baseUrl": "./",
+    "paths": {
+      "@/*": ["src/*"],
+      "@config/*": ["src/config/*"],
+      "@controllers/*": ["src/controllers/*"],
+      "@services/*": ["src/services/*"],
+      "@repositories/*": ["src/repositories/*"],
+      "@middleware/*": ["src/middleware/*"],
+      "@validators/*": ["src/validators/*"],
+      "@types/*": ["src/types/*"]
+    }
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "tests/**/*.test.ts"]
+}
+```
+
+<Callout type="warning">
+When using path aliases (`@/...`) in Node.js, compiling with `tsc` leaves the raw alias paths in your `dist/` directory. For production builds, either use `tsconfig-paths` (`node -r tsconfig-paths/register dist/index.js`) or compile using a bundler like `esbuild` or `tsup`.
+</Callout>
+
+---
+
+## 3. Essential Core Packages
+
+Install our mandatory production and development dependencies:
+
+```bash
+# Production dependencies
+npm install express zod helmet cors morgan dotenv
+
+# Production utility additions
+npm install pino pino-http http-status-codes
+
+# Development dependencies
+npm install -D typescript @types/express @types/node @types/cors @types/morgan
+npm install -D ts-node-dev eslint prettier @typescript-eslint/parser @typescript-eslint/eslint-plugin
+npm install -D husky lint-staged jest ts-jest @types/jest supertest @types/supertest
+```
+
+### Purpose of Core Packages
+
+- **`express`**: Lightweight HTTP routing and middleware kernel.
+- **`zod`**: Schema-first runtime validation for incoming JSON bodies, query strings, and headers.
+- **`helmet`**: Sets critical HTTP response security headers (HSTS, CSP, X-Frame-Options).
+- **`cors`**: Express middleware enabling strictly configured Cross-Origin Resource Sharing.
+- **`pino` / `pino-http`**: Ultra-fast structured JSON logger for production observability.
+- **`ts-node-dev`**: Rapid development server with automatic file watching and fast incremental restarts without full AST compilation.
+
+---
+
+## 4. Code Quality: ESLint, Prettier & Git Hooks
+
+Ensure consistent formatting and automated static analysis across the entire engineering team.
+
+### ESLint Configuration (`.eslintrc.cjs`)
+
+```javascript title=".eslintrc.cjs"
+module.exports = {
+  root: true,
+  parser: '@typescript-eslint/parser',
+  parserOptions: {
+    ecmaVersion: 'latest',
+    sourceType: 'module',
+    project: ['./tsconfig.json'],
+  },
+  plugins: ['@typescript-eslint'],
+  extends: [
+    'eslint:recommended',
+    'plugin:@typescript-eslint/recommended',
+    'plugin:@typescript-eslint/recommended-requiring-type-checking',
+    'prettier',
+  ],
+  rules: {
+    '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+    '@typescript-eslint/explicit-function-return-type': 'off',
+    '@typescript-eslint/no-explicit-any': 'error',
+    'no-console': ['warn', { allow: ['warn', 'error', 'info'] }],
+  },
+  ignorePatterns: ['dist', 'node_modules', '*.cjs'],
+};
+```
+
+### Prettier Configuration (`.prettierrc`)
+
+```json title=".prettierrc"
+{
+  "semi": true,
+  "trailingComma": "all",
+  "singleQuote": true,
+  "printWidth": 100,
+  "tabWidth": 2
+}
+```
+
+### Git Automation with Husky & Lint-Staged
+
+Automate checks on `git commit` to block unformatted or broken code before it hits GitHub:
+
+```bash
+# Initialize Husky
+npx husky init
+
+# Configure lint-staged in package.json
+```
+
+```json title="package.json (lint-staged section)"
+{
+  "lint-staged": {
+    "*.ts": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,yml}": [
+      "prettier --write"
+    ]
+  }
+}
+```
+
+In `.husky/pre-commit`:
+```bash
+npx lint-staged
+```
+
+---
+
+## 5. Standardized `package.json` Scripts
+
+Every Nexium Media Node.js backend must expose standard lifecycle scripts:
+
+```json title="package.json"
+{
+  "name": "nm-express-api",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "ts-node-dev --respawn --transpile-only --exit-child src/index.ts",
+    "build": "tsc --project tsconfig.json",
+    "start": "node dist/index.js",
+    "lint": "eslint src --ext .ts",
+    "lint:fix": "eslint src --ext .ts --fix",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\"",
+    "test": "jest --runInBand",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "type-check": "tsc --noEmit"
+  }
+}
+```
+
+---
+
+## 6. Environment Variables Template (`.env.example`)
+
+Never commit actual secret values. Provide a self-documenting `.env.example`:
+
+```bash title=".env.example"
+# Application Runtime
+NODE_ENV=development
+PORT=4000
+HOST=0.0.0.0
+APP_NAME=nm-express-service
+
+# Database Connection (PostgreSQL via Prisma)
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/nm_dev_db?schema=public"
+
+# Authentication & JWT
+JWT_ACCESS_SECRET="generate-a-secure-random-secret-at-least-32-chars"
+JWT_REFRESH_SECRET="generate-another-secure-random-secret-here"
+JWT_ACCESS_EXPIRY="15m"
+JWT_REFRESH_EXPIRY="7d"
+
+# Security & CORS
+CORS_ORIGIN="http://localhost:3000,http://localhost:5173"
+
+# Third-Party Integrations
+REDIS_URL="redis://localhost:6379"
+```
+
+---
+
+## 7. Recommended VS Code Extensions
+
+Ensure consistent IDE behavior across developers with `.vscode/extensions.json`:
+
+```json title=".vscode/extensions.json"
+{
+  "recommendations": [
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "prisma.prisma",
+    "eamodio.gitlens",
+    "rangav.vscode-thunder-client"
+  ]
+}
+```
+
+---
+
+## Related
+
+- [Node.js & Express Fundamentals](/docs/development/backend/node-express/express-fundamentals)
+- [TypeScript Advanced Patterns for Node.js](/docs/development/backend/node-express/typescript-node)
+- [Project Scaffolding Structure](/docs/development/backend/getting-started/project-scaffold)
