@@ -1,0 +1,167 @@
+---
+title: Responsive Design & Breakpoints
+description: Mobile-first responsive methodology, breakpoint specifications, fluid typography, container queries, and cross-device testing standards.
+---
+
+Delivering exceptional digital experiences requires interfaces that adapt seamlessly across devices, from 320px mobile screens to 3840px 4K ultrawide displays. Building mobile-first guarantees that our applications perform well on constrained network conditions and smaller viewports before progressively layering enhancements for larger screens.
+
+This guide details our mobile-first methodology, breakpoint systems, fluid scales, container query architectures, and responsive layout patterns.
+
+## Mobile-First Methodology
+
+Nexium Media enforces a strict **mobile-first** approach:
+
+1. **Unprefixed Classes Target Mobile**: Base utility classes without a breakpoint prefix apply to all screen sizes, starting at 0px.
+2. **Breakpoints Apply Upward**: Prefixes like `md:` or `lg:` apply from that viewport width and up (`min-width` media queries).
+3. **Progressive Enhancement**: Add layout columns, expansive tables, and complex navigation only as viewport space expands.
+
+```tsx
+// Correct: Mobile-First (Starts 1-column, scales to 2 on tablet, 4 on desktop)
+<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+
+// Anti-Pattern: Desktop-First (Starts 4-column, overridden down)
+// Harder to maintain, loads unnecessary layout rules on mobile
+```
+
+## Breakpoint Reference Table
+
+Tailwind provides five standard responsive breakpoints based on standard device categories:
+
+| Prefix | Min-Width | Target Device Category | Recommended Architectural Shift |
+| :--- | :--- | :--- | :--- |
+| **`default`** | `0px` | Small mobile devices (iPhone SE, Galaxy S) | Single-column linear layout, full-width inputs, collapsible menus. |
+| **`sm:`** | `640px` | Large phones in landscape, small tablets | 2-column cards, dialog popups instead of full-screen sheets. |
+| **`md:`** | `768px` | Standard tablets (iPad, Galaxy Tab) | Persistent sidebars or horizontal navigation tabs. |
+| **`lg:`** | `1024px` | Small laptops, desktop monitors | Multi-column dashboards, data tables, split-pane editors. |
+| **`xl:`** | `1280px` | Standard desktop displays | Maximum container width constraints (`max-w-7xl`). |
+| **`2xl:`** | `1536px` | Large / Ultrawide desktop monitors | Multi-panel executive dashboards. |
+
+<Callout type="note">
+Never use fixed pixel widths (e.g., `w-[800px]`) on layout containers. Use responsive max-width classes (`max-w-4xl w-full`) to allow containers to shrink naturally when viewed on smaller screens.
+</Callout>
+
+## Fluid Typography & Spacing with `clamp()`
+
+While stepped breakpoints work well for grid layouts, typography and spacing often feel abrupt when jumping sizes between breakpoints. Use CSS `clamp()` for smooth, continuous scaling:
+
+```css
+/* app/globals.css */
+@layer utilities {
+  .text-fluid-h1 {
+    /* Scales smoothly from 2rem (32px) on mobile to 3.75rem (60px) on desktop */
+    font-size: clamp(2rem, 1.25rem + 3.75vw, 3.75rem);
+    line-height: 1.1;
+  }
+
+  .p-fluid-section {
+    /* Scales padding from 1.5rem (24px) to 4rem (64px) */
+    padding: clamp(1.5rem, 0.75rem + 3.75vw, 4rem);
+  }
+}
+```
+
+## Container Queries (`@container`)
+
+Media queries respond to the browser viewport width, which falls short for reusable components that can be placed in different container contexts (such as a sidebar vs. a wide main content area).
+
+**Container Queries** allow a component to adapt based on the width of its direct parent container rather than the browser window:
+
+```tsx
+// 1. Mark parent wrapper as a container
+<div className="@container">
+  {/* 2. Style card according to parent container width */}
+  <article className="flex flex-col @sm:flex-row @sm:items-center @lg:p-8">
+    <div className="h-32 w-full @sm:h-24 @sm:w-24 shrink-0 bg-slate-200" />
+    <div className="p-4">
+      <h3 className="text-base @sm:text-lg @lg:text-2xl font-bold">Campaign Metric</h3>
+      <p className="text-sm text-slate-500">Summary statistics...</p>
+    </div>
+  </article>
+</div>
+```
+
+## Common Responsive Layout Patterns
+
+### 1. Collapsible Sidebar to Hamburger Navigation
+
+```tsx
+export function NavigationShell({ children }: { children: React.ReactNode }) {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  return (
+    <div className="flex min-h-screen">
+      {/* Desktop Sidebar: Hidden on mobile, visible from md up */}
+      <aside className="hidden w-64 border-r bg-slate-50 md:block">
+        <SidebarNav />
+      </aside>
+
+      {/* Mobile Top Header with Hamburger */}
+      <div className="flex flex-1 flex-col">
+        <header className="flex h-16 items-center justify-between border-b px-4 md:hidden">
+          <BrandLogo />
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label="Toggle navigation menu"
+            className="p-2"
+          >
+            <MenuIcon className="h-6 w-6" />
+          </button>
+        </header>
+
+        {/* Mobile Slide-down Drawer */}
+        {mobileMenuOpen && (
+          <div className="border-b bg-white p-4 md:hidden">
+            <SidebarNav onNavigate={() => setMobileMenuOpen(false)} />
+          </div>
+        )}
+
+        <main className="flex-1 p-4 md:p-8">{children}</main>
+      </div>
+    </div>
+  );
+}
+```
+
+### 2. Responsive Aspect Ratio Containers
+
+Prevent layout shifts on images and videos using Tailwind's aspect-ratio utilities:
+
+```tsx
+<div className="relative aspect-video w-full overflow-hidden rounded-lg bg-slate-100">
+  <Image
+    src="/hero.jpg"
+    alt="Corporate presentation preview"
+    fill
+    sizes="(max-width: 768px) 100vw, 50vw"
+    className="object-cover"
+  />
+</div>
+```
+
+## Touch Target Sizes & Accessibility Standards
+
+Under WCAG 2.1 AA success criterion 2.5.5, all interactive touch targets (buttons, links, tab items) on mobile devices must provide a minimum target area of **44x44 CSS pixels**:
+
+```tsx
+// Anti-Pattern: Microscopic touch target on mobile
+<button className="h-5 w-5 text-xs">X</button>
+
+// Best Practice: Minimum 44px touch target (p-3 or h-11 w-11)
+<button className="inline-flex h-11 w-11 items-center justify-center p-2 text-slate-600">
+  <CloseIcon className="h-5 w-5" />
+</button>
+```
+
+## Testing Responsive Interfaces
+
+- **Chrome DevTools Device Toolbar**: Test standard device presets (iPhone 14, iPad Pro, Galaxy S20). Toggle network throttling to "Slow 4G" to observe layout stability during resource loading.
+- **Orientation Changes**: Verify layouts adapt cleanly when rotating between portrait and landscape modes.
+- **Real Device Testing**: Automated emulation cannot catch platform-specific quirks (e.g., iOS Safari dynamic viewport address bar resizing). Test key flows on physical iOS and Android hardware before launch.
+
+## Related
+
+- [Styling Philosophy Overview](/docs/development/frontend/styling)
+- [Tailwind CSS Architecture](/docs/development/frontend/styling/tailwind-css)
+- [Design Tokens & Theming](/docs/development/frontend/styling/design-tokens)
+- [Accessibility Compliance Guide](/docs/development/frontend/quality/accessibility)
+

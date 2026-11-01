@@ -1,0 +1,219 @@
+---
+title: Data Fetching & Server Cache
+description: Server Component data fetching, TanStack Query v5 patterns, optimistic UI updates, cache invalidation, and real-time synchronization.
+---
+
+Modern web applications require responsive data fetching patterns that handle network latency gracefully. In the Next.js App Router architecture, data fetching is split between **React Server Components** (for static rendering and initial page loads) and **TanStack Query** (for client-side caching, polling, infinite scrolling, and optimistic mutations).
+
+This guide details server and client data fetching patterns, cache invalidation lifecycles, and optimistic update strategies.
+
+## Server-Side Data Fetching (Server Components)
+
+Async Server Components execute exclusively on the server, allowing direct queries to databases or internal microservices without exposing API credentials to the browser:
+
+```tsx
+// app/dashboard/campaigns/page.tsx
+import { db } from "@/lib/db";
+import { Suspense } from "react";
+import { CampaignList } from "@/components/campaigns/CampaignList";
+import { ListSkeleton } from "@/components/ui/Skeletons";
+
+export default async function CampaignsPage() {
+  // Direct ORM query executed on the server
+  const initialCampaigns = await db.campaign.findMany({
+    orderBy: { createdAt: "desc" },
+    take: 20,
+  });
+
+  return (
+    <main className="p-8">
+      <h1>Active Marketing Campaigns</h1>
+      <Suspense fallback={<ListSkeleton />}>
+        <CampaignList initialData={initialCampaigns} />
+      </Suspense>
+    </main>
+  );
+}
+```
+
+## Client-Side Data Fetching: TanStack Query v5
+
+When an interactive view requires polling, refetching on window focus, infinite scrolling, or optimistic mutations, use **TanStack Query (React Query v5)**.
+
+### Query Client Setup
+
+```tsx
+// app/providers.tsx
+"use client";
+
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
+import { useState } from "react";
+
+export function AppProviders({ children }: { children: React.ReactNode }) {
+  const [queryClient] = useState(
+    () =>
+      new QueryClient({
+        defaultOptions: {
+          queries: {
+            staleTime: 1000 * 60 * 5, // 5 minutes fresh data window
+            gcTime: 1000 * 60 * 30,    // Keep unused cache entries in memory for 30 minutes
+            retry: (failureCount, error) => {
+              // Never retry client 4xx authentication or not-found errors
+              if (error instanceof Error && error.message.includes("404")) return false;
+              return failureCount < 2;
+            },
+            refetchOnWindowFocus: process.env.NODE_ENV === "production",
+          },
+        },
+      })
+  );
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      {children}
+      <ReactQueryDevtools initialIsOpen={false} />
+    </QueryClientProvider>
+  );
+}
+```
+
+## `useQuery` Patterns: Key Design & State Handling
+
+Always define hierarchical query keys as arrays to support targeted, prefix-based cache invalidation:
+
+```tsx
+"use client";
+
+import { useQuery } from "@tanstack/react-query";
+import { fetchCampaigns } from "@/services/campaign-service";
+
+export function CampaignsTable({ filterStatus }: { filterStatus: string }) {
+  const {
+    data: campaigns,
+    isLoading,   // True only on initial fetch with no cached data
+    isFetching,  // True whenever a network request is in-flight (including background refetches)
+    error,
+    isError,
+  } = useQuery({
+    // Hierarchical query key: ["campaigns", "list", { status: "active" }]
+    queryKey: ["campaigns", "list", { status: filterStatus }],
+    queryFn: ({ signal }) => fetchCampaigns({ status: filterStatus, signal }),
+  });
+
+  if (isLoading) return <div>Loading initial campaign dataset...</div>;
+  if (isError) return <div>Error loading campaigns: {error.message}</div>;
+
+  return (
+    <div className="relative">
+      {isFetching && <div className="absolute top-0 right-0 text-xs text-blue-500">Updating...</div>}
+      <table>
+        {campaigns?.map((c) => (
+          <tr key={c.id}>
+            <td>{c.name}</td>
+            <td>{c.budget}</td>
+          </tr>
+        ))}
+      </table>
+    </div>
+  );
+}
+```
+
+## Optimistic Updates with `useMutation`
+
+For actions like toggling a bookmark, liking a post, or updating a status, waiting for a network round-trip makes the UI feel sluggish. Use optimistic updates to update the cache immediately and roll back if the server request fails:
+
+```tsx
+"use client";
+
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { updateCampaignStatus } from "@/services/campaign-service";
+
+interface MutationContext {
+  previousCampaigns?: Campaign[];
+}
+
+export function useOptimisticStatusUpdate() {
+  const queryClient = useQueryClient();
+
+  return useMutation<Campaign, Error, { id: string; status: "active" | "paused" }, MutationContext>({
+    mutationFn: ({ id, status }) => updateCampaignStatus(id, status),
+
+    // 1. When mutation is triggered: cancel refetches, snapshot cache, apply optimistic update
+    onMutate: async ({ id, status }) => {
+      await queryClient.cancelQueries({ queryKey: ["campaigns", "list"] });
+
+      const previousCampaigns = queryClient.getQueryData<Campaign[]>(["campaigns", "list"]);
+
+      queryClient.setQueryData<Campaign[]>(["campaigns", "list"], (old = []) =>
+        old.map((c) => (c.id === id ? { ...c, status } : c))
+      );
+
+      return { previousCampaigns };
+    },
+
+    // 2. If the request fails, roll back to the snapshot
+    onError: (err, variables, context) => {
+      if (context?.previousCampaigns) {
+        queryClient.setQueryData(["campaigns", "list"], context.previousCampaigns);
+      }
+      console.error("Mutation failed, rolled back cache:", err);
+    },
+
+    // 3. Always refetch in background after completion to synchronize with server state
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["campaigns", "list"] });
+    },
+  });
+}
+```
+
+## Infinite Scrolling with `useInfiniteQuery`
+
+For paginated streams and continuous feeds:
+
+```tsx
+import { useInfiniteQuery } from "@tanstack/react-query";
+
+export function InfiniteAuditLog() {
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
+    queryKey: ["audit-logs"],
+    queryFn: ({ pageParam = 1 }) => fetch(`/api/audit?page=${pageParam}`).then((r) => r.json()),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => lastPage.nextPage ?? undefined,
+  });
+
+  return (
+    <div>
+      {data?.pages.flatMap((page) => page.items).map((log) => (
+        <div key={log.id}>{log.message}</div>
+      ))}
+      {hasNextPage && (
+        <button onClick={() => fetchNextPage()} disabled={isFetchingNextPage}>
+          {isFetchingNextPage ? "Loading more..." : "Load More"}
+        </button>
+      )}
+    </div>
+  );
+}
+```
+
+## Common Mistakes & Anti-Patterns
+
+1. **Waterfall Fetches**: Awaiting consecutive asynchronous calls sequentially when they could run concurrently with `Promise.all`.
+2. **Missing `AbortSignal`**: Forgetting to forward `({ signal })` from `queryFn` into the underlying `fetch` request, leaving unneeded HTTP connections running after a component unmounts.
+3. **Not Invalidating Related Queries**: Updating a resource via `useMutation` without invalidating related queries, leaving other parts of the application showing stale data.
+
+## Related
+
+- [State & Data Architecture Overview](/docs/development/frontend/state-and-data)
+- [Typed API Client Integration](/docs/development/frontend/state-and-data/api-integration)
+- [Error Handling Architecture](/docs/development/frontend/state-and-data/error-handling)
+- [Performance Optimization](/docs/development/frontend/quality/performance)
+

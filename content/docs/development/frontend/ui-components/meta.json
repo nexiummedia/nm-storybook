@@ -1,0 +1,6 @@
+{
+  "title": "UI Components",
+  "description": "Component architecture, composition patterns, forms, and design system integration.",
+  "pages": ["index", "component-design", "props-and-composition", "forms-and-validation", "reusable-components", "component-library"]
+}
+

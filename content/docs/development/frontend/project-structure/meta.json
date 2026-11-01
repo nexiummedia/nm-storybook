@@ -1,0 +1,6 @@
+{
+  "title": "Project Structure",
+  "description": "Architecture, folder conventions, naming standards, and modular boundaries.",
+  "pages": ["index", "folder-conventions", "naming-conventions", "module-organization"]
+}
+

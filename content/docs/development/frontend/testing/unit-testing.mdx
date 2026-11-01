@@ -1,0 +1,209 @@
+---
+title: Unit & Component Testing
+description: Unit and component testing specifications using Jest, React Testing Library, user-event interactions, query priorities, and real-world form assertions.
+---
+
+Unit tests form the foundational layer of our testing pyramid. They execute rapidly in headless Node/JSDOM environments, providing instant feedback during development. We use **Jest** and **React Testing Library (RTL)** to test pure functions, design system primitives, and interactive component state.
+
+This guide details Jest setup, DOM query priorities, mocking patterns, and comprehensive component testing examples.
+
+## Jest Configuration (`jest.config.ts`)
+
+Our standard Jest configuration supports TypeScript path aliases, JSDOM environment mocking, and CSS module stubs:
+
+```typescript
+// jest.config.ts
+import type { Config } from "jest";
+import nextJest from "next/jest";
+
+const createJestConfig = nextJest({
+  dir: "./",
+});
+
+const customJestConfig: Config = {
+  setupFilesAfterEnv: ["<rootDir>/jest.setup.ts"],
+  testEnvironment: "jest-environment-jsdom",
+  moduleNameMapper: {
+    "^@/(.*)$": "<rootDir>/$1",
+  },
+  testMatch: ["**/*.test.(ts|tsx)"],
+  collectCoverageFrom: [
+    "components/**/*.{ts,tsx}",
+    "features/**/*.{ts,tsx}",
+    "utils/**/*.{ts,tsx}",
+    "!**/*.d.ts",
+    "!**/index.ts",
+  ],
+  coverageThreshold: {
+    global: {
+      branches: 75,
+      functions: 80,
+      lines: 80,
+      statements: 80,
+    },
+  },
+};
+
+export default createJestConfig(customJestConfig);
+```
+
+### Global Test Setup (`jest.setup.ts`)
+
+```typescript
+// jest.setup.ts
+import "@testing-library/jest-dom";
+
+// Polyfill window.matchMedia for responsive components
+Object.defineProperty(window, "matchMedia", {
+  writable: true,
+  value: jest.fn().mockImplementation((query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: jest.fn(),
+    removeListener: jest.fn(),
+    addEventListener: jest.fn(),
+    removeEventListener: jest.fn(),
+    dispatchEvent: jest.fn(),
+  })),
+});
+```
+
+## React Testing Library Query Priority
+
+Always prioritize queries that reflect how users and assistive technologies interact with your markup:
+
+1. **`getByRole`** *(Top Priority)*: Queries elements by their ARIA accessibility role (`button`, `heading`, `checkbox`, `dialog`). Reflects the accessibility tree.
+2. **`getByLabelText`**: Queries form fields by their associated `<label>`.
+3. **`getByPlaceholderText`**: Queries input fields by placeholder text.
+4. **`getByText`**: Queries non-interactive elements (paragraphs, spans, headings) by visible text.
+5. **`getByTestId`** *(Last Resort)*: Used only when an element has no semantic role or dynamic text (e.g., an animated canvas or complex SVG).
+
+```tsx
+// Anti-Pattern: Querying by CSS class or ID
+const button = container.querySelector(".btn-submit");
+
+// Best Practice: Querying by semantic role and accessible name
+const button = screen.getByRole("button", { name: /save changes/i });
+```
+
+## `userEvent` vs. `fireEvent`
+
+Always use `@testing-library/user-event` instead of `fireEvent`:
+
+- `fireEvent.click()` dispatches a synthetic `click` event directly to the target node.
+- `userEvent.click()` simulates realistic user behavior: it moves the cursor, hovers, focuses, fires `pointerdown`, `mousedown`, `mouseup`, and finally `click`.
+
+```typescript
+import userEvent from "@testing-library/user-event";
+
+test("focuses and types into input", async () => {
+  const user = userEvent.setup();
+  render(<SearchInput />);
+
+  const input = screen.getByRole("textbox", { name: /search/i });
+  await user.type(input, "Analytics Report");
+
+  expect(input).toHaveValue("Analytics Report");
+});
+```
+
+## Complete Example: Testing a Login Form
+
+Below is a complete test suite for an authentication form, covering field validation, async submission, error handling, and loading states:
+
+```tsx
+// features/auth/components/LoginForm.test.tsx
+import * as React from "react";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { LoginForm } from "./LoginForm";
+
+describe("LoginForm Component", () => {
+  const mockOnSuccess = jest.fn();
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("renders email and password inputs with a submit button", () => {
+    render(<LoginForm onSuccess={mockOnSuccess} />);
+
+    expect(screen.getByLabelText(/email address/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /sign in/i })).toBeInTheDocument();
+  });
+
+  it("displays client-side validation errors when submitting empty form", async () => {
+    const user = userEvent.setup();
+    render(<LoginForm onSuccess={mockOnSuccess} />);
+
+    await user.click(screen.getByRole("button", { name: /sign in/i }));
+
+    expect(await screen.findByText(/email is required/i)).toBeInTheDocument();
+    expect(await screen.findByText(/password is required/i)).toBeInTheDocument();
+    expect(mockOnSuccess).not.toHaveBeenCalled();
+  });
+
+  it("submits valid credentials and triggers onSuccess callback", async () => {
+    const user = userEvent.setup();
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ token: "fake-jwt-token" }),
+    });
+
+    render(<LoginForm onSuccess={mockOnSuccess} />);
+
+    await user.type(screen.getByLabelText(/email address/i), "engineer@nexiummedia.com");
+    await user.type(screen.getByLabelText(/password/i), "SecurePassword123!");
+    await user.click(screen.getByRole("button", { name: /sign in/i }));
+
+    await waitFor(() => {
+      expect(mockOnSuccess).toHaveBeenCalledWith({ token: "fake-jwt-token" });
+    });
+  });
+
+  it("displays an accessible server error message when API rejects credentials", async () => {
+    const user = userEvent.setup();
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      json: async () => ({ message: "Invalid email or password." }),
+    });
+
+    render(<LoginForm onSuccess={mockOnSuccess} />);
+
+    await user.type(screen.getByLabelText(/email address/i), "wrong@nexiummedia.com");
+    await user.type(screen.getByLabelText(/password/i), "WrongPassword123!");
+    await user.click(screen.getByRole("button", { name: /sign in/i }));
+
+    const errorAlert = await screen.findByRole("alert");
+    expect(errorAlert).toHaveTextContent(/invalid email or password/i);
+  });
+});
+```
+
+## The Role of Snapshot Testing
+
+Snapshot testing captures the rendered HTML of a component and compares it against a saved baseline.
+
+- **When to Use**: Small, stable primitives (such as an SVG icon component or a formatted date helper) where any markup change is unexpected.
+- **When NOT to Use**: Large, complex components or entire pages. Developers quickly build a habit of typing `jest -u` to update snapshots without reading the diff, creating an ineffective test suite.
+
+<Callout type="warning">
+Never rely exclusively on snapshot tests for interactive components. Always assert specific accessible roles, text outputs, and user interaction callbacks.
+</Callout>
+
+## Common Testing Anti-Patterns
+
+1. **Testing Implementation Details**: Asserting the internal state of a hook or checking private component methods. Test only the rendered output and user interactions.
+2. **Missing `waitFor` on Async State**: Asserting DOM changes before an asynchronous Promise or state transition has settled causes intermittent test flakiness.
+3. **Not Cleaning Up Mocks**: Forgetting `jest.clearAllMocks()` in `beforeEach` causes call counts and mock implementations to leak between test cases.
+
+## Related
+
+- [Testing Architecture Overview](/docs/development/frontend/testing)
+- [Integration Testing with MSW](/docs/development/frontend/testing/integration-testing)
+- [End-to-End Testing with Playwright](/docs/development/frontend/testing/end-to-end-testing)
+- [Forms & Schema Validation](/docs/development/frontend/ui-components/forms-and-validation)
+

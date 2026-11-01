@@ -1,0 +1,189 @@
+---
+title: Tailwind CSS Architecture
+description: Configuration, best practices, class ordering, variant modifiers, and utility ergonomics with Tailwind CSS.
+---
+
+Tailwind CSS is the foundation of styling at Nexium Media. Its utility-first approach provides predictable layouts, eliminates CSS bundle growth over time, and ensures responsive interfaces.
+
+This guide details configuration, utility ordering, modifier patterns, dynamic class merging, and common pitfalls.
+
+## Setup & Configuration
+
+### Tailwind v4 Global CSS Import
+
+In Tailwind CSS v4, stylesheets import the framework using the standard CSS `@import` directive directly in `app/globals.css`:
+
+```css
+/* app/globals.css */
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+  }
+}
+```
+
+### Configuration (`tailwind.config.ts`)
+
+For advanced theme token mapping, custom screens, and plugins, maintain `tailwind.config.ts`:
+
+```typescript
+import type { Config } from "tailwindcss";
+
+const config: Config = {
+  darkMode: ["class"],
+  content: [
+    "./app/**/*.{ts,tsx}",
+    "./components/**/*.{ts,tsx}",
+    "./features/**/*.{ts,tsx}",
+  ],
+  theme: {
+    extend: {
+      colors: {
+        background: "hsl(var(--background))",
+        foreground: "hsl(var(--foreground))",
+        primary: {
+          DEFAULT: "hsl(var(--primary))",
+          foreground: "hsl(var(--primary-foreground))",
+        },
+      },
+      borderRadius: {
+        lg: "var(--radius)",
+        md: "calc(var(--radius) - 2px)",
+        sm: "calc(var(--radius) - 4px)",
+      },
+    },
+  },
+  plugins: [
+    require("@tailwindcss/typography"),
+    require("@tailwindcss/forms"),
+  ],
+};
+
+export default config;
+```
+
+## Utility Ordering & Automated Formatting
+
+Class readability suffers when classes are written in arbitrary order. We mandate the official **Prettier Tailwind Plugin** (`prettier-plugin-tailwindcss`), which automatically sorts utility classes on save according to the CSS box model:
+
+```tsx
+// Before formatting (disorganized)
+<button className="text-white hover:bg-blue-700 p-2 font-bold bg-blue-600 rounded">
+
+// After automated formatting (deterministic box-model order: layout -> sizing -> typography -> background -> interactive)
+<button className="rounded bg-blue-600 p-2 font-bold text-white hover:bg-blue-700">
+```
+
+## When to Use `@apply` (and When to Avoid It)
+
+`@apply` allows extracting Tailwind utilities into custom CSS classes. However, overusing it reintroduces traditional CSS maintainability problems.
+
+```css
+/* Anti-Pattern: Extracting everything with @apply defeats the purpose of Tailwind */
+.custom-card {
+  @apply rounded-lg border border-slate-200 bg-white p-6 shadow-md;
+}
+```
+
+### The Rules of `@apply`
+- **Avoid**: Never use `@apply` to build general component abstractions (`.btn`, `.card`). Use reusable React components (`<Button>`, `<Card>`) instead.
+- **Permitted**: Use `@apply` only in global resets, third-party library overrides (e.g., custom styling for Quill or Stripe Elements), or markdown typography containers (`.prose`).
+
+## Advanced Variant Modifiers
+
+Tailwind provides powerful modifiers for styling interactive states and DOM relationships without writing custom CSS:
+
+### 1. Pseudo-Classes & Accessible Focus Rings
+
+```tsx
+<button className="bg-blue-600 hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+  Save Changes
+</button>
+```
+
+### 2. ARIA State Modifiers
+
+Target accessibility state attributes directly:
+
+```tsx
+<div
+  role="switch"
+  aria-checked={isEnabled}
+  className="h-6 w-11 rounded-full bg-slate-300 aria-checked:bg-blue-600"
+>
+  <span className="block h-5 w-5 rounded-full bg-white transition-transform aria-checked:translate-x-5" />
+</div>
+```
+
+### 3. Group and Peer Modifiers
+
+Style child elements based on parent state (`group`) or sibling state (`peer`):
+
+```tsx
+{/* Group: Hovering over the entire card highlights the arrow icon */}
+<div className="group rounded-lg border p-4 hover:border-blue-500 hover:shadow-md">
+  <h3 className="group-hover:text-blue-600">Enterprise Dashboard</h3>
+  <span className="inline-block transition-transform group-hover:translate-x-1">→</span>
+</div>
+
+{/* Peer: Floating input label transforms when input is focused or filled */}
+<div className="relative">
+  <input id="email" placeholder=" " className="peer rounded border px-3 pt-5 pb-2" />
+  <label
+    htmlFor="email"
+    className="absolute left-3 top-1 text-xs text-slate-400 transition-all peer-placeholder-shown:top-3 peer-placeholder-shown:text-sm peer-focus:top-1 peer-focus:text-xs peer-focus:text-blue-600"
+  >
+    Email Address
+  </label>
+</div>
+```
+
+## Arbitrary Values Policy (`[value]`)
+
+Tailwind allows inline arbitrary values, such as `h-[347px]` or `bg-[#0b132b]`.
+
+- **Restricted**: Arbitrary values bypass design tokens and break visual consistency across projects.
+- **Exceptions**: Permitted only for dynamic mathematical calculations (e.g., `top-[calc(100%-4rem)]`), background images, or strict third-party canvas constraints.
+- **Requirement**: If an arbitrary value is unavoidable, add a comment explaining why a standard theme token cannot be used.
+
+<Callout type="warning">
+Arbitrary color values like `bg-[#2a4365]` will fail code review. If a color is missing from the design system, coordinate with the UX team to declare it as a design token in `globals.css` and `tailwind.config.ts`.
+</Callout>
+
+## Common Mistakes & Pitfalls
+
+1. **Constructing Dynamic Class Names**: Tailwind scans source files with regular expressions at build time. Dynamically assembled strings cannot be detected:
+   ```tsx
+   // BROKEN: Tailwind cannot detect this dynamic class at build time
+   <div className={`text-${color}-500`} />
+
+   // CORRECT: Use full class strings in a lookup map
+   const colorMap = {
+     red: "text-red-500",
+     blue: "text-blue-500",
+   };
+   <div className={colorMap[color]} />
+   ```
+2. **Missing Dark Mode Variants**: Forgetting to add `dark:` utility variants when styling backgrounds or text leaves components unreadable in dark mode.
+3. **Class Specificity Collisions**: Using plain string concatenation rather than `cn()` when overriding padding, margins, or colors on shared components.
+
+## Related
+
+- [Styling Philosophy Overview](/docs/development/frontend/styling)
+- [Responsive Design & Breakpoints](/docs/development/frontend/styling/responsive-design)
+- [Design Tokens & Theming](/docs/development/frontend/styling/design-tokens)
+- [Reusable Component Architecture](/docs/development/frontend/ui-components/reusable-components)
+

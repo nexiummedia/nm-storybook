@@ -1,0 +1,156 @@
+---
+title: Component Library & Design System
+description: Architecture of Nexium Media's component library, integrating shadcn/ui and Radix UI primitives, Lucide iconography, and next-themes theming.
+---
+
+Nexium Media builds enterprise frontends atop a headless, copy-and-own component model powered by **shadcn/ui** and **Radix UI primitives**. Unlike traditional monolithic UI component libraries distributed as opaque npm packages (e.g., Material UI, Chakra UI), the shadcn philosophy places full ownership of the source code directly within your repository.
+
+This architecture enables total customizability, eliminates version-locking regressions, and gives engineering teams complete control over their DOM tree, performance, and accessibility.
+
+## Headless Architecture: Radix UI Primitives
+
+All dynamic components (modals, dropdowns, popovers, tabs, selects) build upon Radix UI unstyled primitives:
+
+- **Accessible by Default**: Implements the WAI-ARIA authoring practices automatically (keyboard focus traps, arrow key roving focus, escape key dismissals, screen reader announcements).
+- **Unstyled Foundation**: Ships with zero CSS classes, allowing complete styling flexibility using Tailwind CSS tokens.
+- **Composable State**: Fully supports controlled or uncontrolled states via React props.
+
+```tsx
+// Example Radix Primitive integration inside components/ui/Dialog.tsx
+import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { cn } from "@/lib/utils";
+
+export const Dialog = DialogPrimitive.Root;
+export const DialogTrigger = DialogPrimitive.Trigger;
+export const DialogPortal = DialogPrimitive.Portal;
+
+export const DialogOverlay = React.forwardRef<
+  React.ElementRef<typeof DialogPrimitive.Overlay>,
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Overlay>
+>(({ className, ...props }, ref) => (
+  <DialogPrimitive.Overlay
+    ref={ref}
+    className={cn(
+      "fixed inset-0 z-50 bg-black/60 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+      className
+    )}
+    {...props}
+  />
+));
+DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
+```
+
+## Adding & Customizing Components via shadcn CLI
+
+To add a new component primitive to a client repository:
+
+```bash
+# Add a specific component (e.g., dropdown-menu)
+npx shadcn@latest add dropdown-menu
+```
+
+The CLI places the component directly into `components/ui/DropdownMenu.tsx`. Once generated:
+1. Verify compliance with Nexium design tokens.
+2. Ensure strict TypeScript types and export names match company conventions.
+3. Colocate unit tests (`DropdownMenu.test.tsx`).
+
+<Callout type="note">
+Because the component source lives directly in your repository, you can modify its markup, customize animation keyframes, or alter variant tokens without waiting for an upstream npm release.
+</Callout>
+
+## Icon System: Lucide React
+
+Nexium Media standardizes on **Lucide React** (`lucide-react`) for iconography:
+
+- Clean, consistent 24x24 SVG coordinate grid.
+- Excellent tree-shaking support when importing named icon symbols.
+- Standardized styling via Tailwind sizing classes.
+
+```tsx
+import { AlertCircle, CheckCircle2, ChevronRight } from "lucide-react";
+
+export function StatusIndicator({ status }: { status: "success" | "error" }) {
+  if (status === "success") {
+    return <CheckCircle2 className="h-5 w-5 text-emerald-500" aria-label="Operation successful" />;
+  }
+  return <AlertCircle className="h-5 w-5 text-red-500" aria-label="Operation failed" />;
+}
+```
+
+<Callout type="warning">
+Always import specific icon symbols explicitly. Never use wildcard imports (`import * as Icons from "lucide-react"`), as this forces the entire SVG icon bundle (1,000+ icons) into the client build.
+</Callout>
+
+## Theming & Dark Mode: `next-themes`
+
+We implement system-aware light and dark mode using `next-themes` and CSS variables:
+
+### 1. Theme Provider Registration
+
+```tsx
+// components/providers/ThemeProvider.tsx
+"use client";
+
+import * as React from "react";
+import { ThemeProvider as NextThemesProvider } from "next-themes";
+
+export function ThemeProvider({ children }: { children: React.ReactNode }) {
+  return (
+    <NextThemesProvider
+      attribute="class"
+      defaultTheme="system"
+      enableSystem
+      disableTransitionOnChange
+    >
+      {children}
+    </NextThemesProvider>
+  );
+}
+```
+
+### 2. Theme Toggle Component
+
+```tsx
+"use client";
+
+import * as React from "react";
+import { Moon, Sun } from "lucide-react";
+import { useTheme } from "next-themes";
+import { Button } from "@/components/ui/Button";
+
+export function ThemeToggle() {
+  const { theme, setTheme } = useTheme();
+
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+      aria-label="Toggle visual theme"
+    >
+      <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+      <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+    </Button>
+  );
+}
+```
+
+## Contributing to the Shared Component Library
+
+When contributing a new component to the global shared library, the pull request must satisfy our five-point review checklist:
+
+| Verification Area | Requirement |
+| :--- | :--- |
+| **Accessibility Audit** | Passes automated `axe` audit; verified keyboard focus order (Tab, Shift+Tab, Escape, Space/Enter); correct ARIA roles. |
+| **Design Tokens** | Zero hardcoded hexadecimal colors or pixel margins; all styles reference standard theme tokens (`bg-primary`, `text-muted-foreground`). |
+| **Unit Test Coverage** | Colocated `*.test.tsx` file testing all CVA variants, sizes, and user interactions via `@testing-library/react`. |
+| **Ref Forwarding** | Component uses `React.forwardRef` and sets `displayName` matching the file name. |
+| **TypeScript Strictness**| Fully typed props interface extending native HTML attributes without `any`. |
+
+## Related
+
+- [UI Components Overview](/docs/development/frontend/ui-components)
+- [Component Design Principles](/docs/development/frontend/ui-components/component-design)
+- [Reusable Component Architecture](/docs/development/frontend/ui-components/reusable-components)
+- [Design Tokens & Theming](/docs/development/frontend/styling/design-tokens)
+

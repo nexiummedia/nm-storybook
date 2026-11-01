@@ -1,0 +1,244 @@
+---
+title: Modern Technical SEO & Metadata
+description: Technical search engine optimization, Next.js metadata API, Open Graph social cards, JSON-LD structured data, dynamic sitemaps, and indexing robots.
+---
+
+Technical Search Engine Optimization (SEO) ensures that search engine crawlers (Googlebot, Bingbot) can discover, index, and understand the content and hierarchy of client web applications. In the Next.js App Router, server-rendered HTML and metadata generation provide an optimal foundation for crawlability.
+
+This guide details our standards for metadata configuration, Open Graph social assets, JSON-LD structured data schemas, canonical URL management, and programmatic sitemaps.
+
+## The Next.js Metadata API
+
+Metadata configuration is managed via Next.js metadata exports in `layout.tsx` or `page.tsx`.
+
+### 1. Static Global Metadata (`app/layout.tsx`)
+
+Declare foundational branding, base URLs, and title templates at the root layout level:
+
+```tsx
+// app/layout.tsx
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  metadataBase: new URL("https://nexiummedia.com"),
+  title: {
+    default: "Nexium Media | Enterprise Digital Engineering & Media",
+    template: "%s | Nexium Media",
+  },
+  description:
+    "Nexium Media builds enterprise web applications, headless commerce systems, and digital platforms for global brands.",
+  keywords: ["Digital Agency", "Next.js Development", "Enterprise Web Apps", "React"],
+  authors: [{ name: "Nexium Media Engineering Team" }],
+  creator: "Nexium Media Group",
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
+};
+```
+
+### 2. Dynamic Segment Metadata (`app/case-studies/[slug]/page.tsx`)
+
+For dynamic routes, use `generateMetadata` to fetch record details and generate contextual metadata:
+
+```tsx
+import type { Metadata } from "next";
+import { getCaseStudy } from "@/services/case-studies";
+
+interface Props {
+  params: Promise<{ slug: string }>;
+}
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { slug } = await params;
+  const study = await getCaseStudy(slug);
+
+  if (!study) {
+    return { title: "Case Study Not Found" };
+  }
+
+  const canonicalUrl = `https://nexiummedia.com/case-studies/${slug}`;
+
+  return {
+    title: study.title,
+    description: study.summary,
+    alternates: {
+      canonical: canonicalUrl,
+    },
+    openGraph: {
+      title: `${study.title} | Nexium Case Study`,
+      description: study.summary,
+      url: canonicalUrl,
+      siteName: "Nexium Media",
+      images: [
+        {
+          url: study.heroImageUrl,
+          width: 1200,
+          height: 630,
+          alt: study.title,
+        },
+      ],
+      locale: "en_US",
+      type: "article",
+      publishedTime: study.publishedDate,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: study.title,
+      description: study.summary,
+      images: [study.heroImageUrl],
+      creator: "@NexiumMedia",
+    },
+  };
+}
+```
+
+<Callout type="tip">
+Always produce Open Graph share images with exact dimensions of **1200 x 630 pixels** (1.91:1 aspect ratio). Images that deviate from this ratio will be awkwardly cropped or blurred when shared on LinkedIn, X, or Slack.
+</Callout>
+
+## Structured Data with JSON-LD
+
+Search engines use Schema.org structured data to generate rich snippets in search results (star ratings, event details, breadcrumb trails, FAQ accordions).
+
+Inject typed JSON-LD scripts directly into server-rendered pages:
+
+```tsx
+export function ArticleJsonLd({ article }: { article: ArticleData }) {
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "TechArticle",
+    headline: article.title,
+    description: article.summary,
+    image: [article.ogImageUrl],
+    datePublished: article.publishedAt,
+    dateModified: article.updatedAt,
+    author: {
+      "@type": "Person",
+      name: article.authorName,
+      url: `https://nexiummedia.com/team/${article.authorSlug}`,
+    },
+    publisher: {
+      "@type": "Organization",
+      name: "Nexium Media",
+      logo: {
+        "@type": "ImageObject",
+        url: "https://nexiummedia.com/assets/logo.png",
+      },
+    },
+  };
+
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+    />
+  );
+}
+```
+
+## Programmatic Sitemap Generation (`app/sitemap.ts`)
+
+Next.js App Router allows generating `sitemap.xml` dynamically from code:
+
+```typescript
+// app/sitemap.ts
+import { MetadataRoute } from "next";
+import { getAllArticles } from "@/services/articles";
+
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const baseUrl = "https://nexiummedia.com";
+
+  // Static marketing routes
+  const staticRoutes: MetadataRoute.Sitemap = [
+    {
+      url: baseUrl,
+      lastModified: new Date(),
+      changeFrequency: "weekly",
+      priority: 1.0,
+    },
+    {
+      url: `${baseUrl}/services`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/case-studies`,
+      lastModified: new Date(),
+      changeFrequency: "weekly",
+      priority: 0.9,
+    },
+  ];
+
+  // Dynamic routes fetched from headless CMS
+  const articles = await getAllArticles();
+  const articleRoutes: MetadataRoute.Sitemap = articles.map((article) => ({
+    url: `${baseUrl}/articles/${article.slug}`,
+    lastModified: new Date(article.updatedAt),
+    changeFrequency: "monthly",
+    priority: 0.7,
+  }));
+
+  return [...staticRoutes, ...articleRoutes];
+}
+```
+
+## Programmatic Robots Configuration (`app/robots.ts`)
+
+Define crawler rules dynamically using `app/robots.ts`:
+
+```typescript
+// app/robots.ts
+import { MetadataRoute } from "next";
+
+export default function robots(): MetadataRoute.Robots {
+  const isProduction = process.env.NEXT_PUBLIC_APP_ENV === "production";
+
+  // Completely block indexing on staging or preview deployments
+  if (!isProduction) {
+    return {
+      rules: {
+        userAgent: "*",
+        disallow: "/",
+      },
+    };
+  }
+
+  return {
+    rules: [
+      {
+        userAgent: "*",
+        allow: "/",
+        disallow: ["/api/", "/dashboard/", "/admin/", "/auth/"],
+      },
+    ],
+    sitemap: "https://nexiummedia.com/sitemap.xml",
+  };
+}
+```
+
+<Callout type="warning">
+Always verify that staging and preview environments block search engine crawling via `robots.ts` or an `X-Robots-Tag: noindex` header. Allowing staging domains to be crawled triggers duplicate content penalties on your primary domain.
+</Callout>
+
+## Common Technical SEO Pitfalls
+
+1. **Missing Canonical Tags**: When pages are accessible via multiple query parameters (e.g., `?sort=price` vs `?sort=date`), omiting canonical tags causes search engines to flag duplicate content.
+2. **Duplicate Title Tags**: Assigning identical `<title>` strings across distinct pages confuses crawlers about page intent and keyword targeting.
+3. **Hidden Content via Client-Only Hydration**: Content rendered exclusively via client-side `useEffect` may not be indexed by crawlers with tight render budgets. Keep indexable content inside Server Components.
+
+## Related
+
+- [Quality Standards Overview](/docs/development/frontend/quality)
+- [Next.js App Router Architecture](/docs/development/frontend/fundamentals/nextjs)
+- [Performance Optimization & Web Vitals](/docs/development/frontend/quality/performance)
+- [HTML & Semantic CSS Architecture](/docs/development/frontend/fundamentals/html-css)
+

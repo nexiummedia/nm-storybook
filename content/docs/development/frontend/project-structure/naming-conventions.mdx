@@ -1,0 +1,117 @@
+---
+title: Naming Conventions & Style Guide
+description: Universal naming standards for files, components, functions, hooks, state variables, and CSS classes across Nexium Media codebases.
+---
+
+Consistent naming standards reduce cognitive load across a 100+ engineer team. When identifiers adhere to predictable grammatical and casing patterns, developers can immediately discern the type, lifecycle, and behavior of any entity in the codebase without navigating to its declaration.
+
+This guide outlines our mandatory naming conventions and provides a reference table of correct versus prohibited patterns.
+
+## Summary of Casing Standards
+
+| Entity Category | Casing Convention | Syntax Pattern | Concrete Example |
+| :--- | :--- | :--- | :--- |
+| **React Components** | `PascalCase.tsx` | Noun phrase | `UserProfileCard.tsx`, `DataTable.tsx` |
+| **Utilities & Helpers** | `kebab-case.ts` | Verb-noun phrase | `format-currency.ts`, `validate-token.ts` |
+| **Custom Hooks** | `camelCase.ts` | `use` + descriptive phrase | `useAuthSession.ts`, `useMediaQuery.ts` |
+| **Directories & Routes** | `kebab-case/` | Domain / segment name | `app/client-portal/`, `features/user-management/` |
+| **Interfaces & Types** | `PascalCase` | Descriptive noun | `CampaignRecord`, `ApiResponse<T>` |
+| **Global Constants** | `SCREAMING_SNAKE_CASE` | Noun / configuration | `MAX_RETRY_ATTEMPTS`, `DEFAULT_LOCALE` |
+| **Event Handlers (Internal)** | `camelCase` | `handle` + Event | `handleSubmit`, `handleRowSelect` |
+| **Event Props (Callbacks)** | `camelCase` | `on` + Event | `onSubmit`, `onRowSelect` |
+| **Boolean Flags & Props** | `camelCase` | `is` / `has` / `can` / `should` | `isLoading`, `hasPermission`, `canEdit` |
+
+## Detailed Architectural Rules
+
+### 1. Component & File Naming
+- **Single Component per File**: The filename must match the default or primary exported component name exactly: `UserCard.tsx` exports `export function UserCard()`.
+- **Compound Components**: When authoring compound sub-components, name files with their specific sub-part: `SelectTrigger.tsx`, `SelectContent.tsx`.
+- **Avoid Ambiguous Names**: Avoid naming generic files `index.tsx` inside deeply nested folders when it impairs quick-open search (`Cmd + P`). Use `CampaignsList.tsx` or `UserAvatar.tsx`.
+
+### 2. Custom Hooks
+- Hooks must always start with the lowercase prefix `use` to comply with React's linter rules.
+- Filenames must match the hook name: `useDebounce.ts` defines `export function useDebounce()`.
+
+### 3. Boolean Properties & State Variables
+Booleans must read as affirmative assertions:
+
+```typescript
+// Correct
+const [isLoading, setIsLoading] = useState(false);
+const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(false);
+const [canSubmitForm, setCanSubmitForm] = useState(true);
+
+// Prohibited: Ambiguous or negative flags
+const [loading, setLoading] = useState(false); // Ambiguous type
+const [isNotValid, setIsNotValid] = useState(false); // Double negative trap
+```
+
+### 4. Event Handlers vs. Event Props
+Maintain a strict distinction between handler functions (implementations) and event props (callbacks passed down):
+
+```tsx
+interface SearchBarProps {
+  // Callback prop starts with 'on'
+  onSearchSubmit: (query: string) => void;
+  onClear?: () => void;
+}
+
+export function SearchBar({ onSearchSubmit, onClear }: SearchBarProps) {
+  // Internal handler implementation starts with 'handle'
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // ... local logic
+  };
+
+  const handleFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSearchSubmit(query);
+  };
+
+  return <form onSubmit={handleFormSubmit}>...</form>;
+}
+```
+
+### 5. Type and Interface Naming
+- Do **not** prefix interfaces with `I` (e.g., avoid `IUser`). TypeScript guidelines discourage `I` prefixes as they expose implementation details.
+- Suffix Data Transfer Objects and Schemas appropriately: `CreateUserDto`, `UserSchema`.
+
+```typescript
+// Correct
+export interface User {
+  id: string;
+  name: string;
+}
+
+export type UserRole = "admin" | "editor" | "guest";
+
+// Prohibited
+export interface IUser { ... } // Do not use Hungarian notation
+```
+
+### 6. CSS & Tailwind Class Names
+- Do not write custom CSS class names in component stylesheets unless authoring complex SVG keyframes or third-party override layers.
+- Rely on Tailwind utility classes combined using the `cn()` utility.
+
+## Correct vs. Prohibited Reference Table
+
+| Target | Prohibited (Do Not Use) | Correct (Nexium Standard) | Why? |
+| :--- | :--- | :--- | :--- |
+| **Component File** | `user_profile.jsx`, `user-profile.tsx` | `UserProfile.tsx` | Components use PascalCase matching the symbol name. |
+| **Utility File** | `DateHelper.ts`, `date_helper.ts` | `date-helpers.ts` | Utilities use lowercase kebab-case. |
+| **Custom Hook** | `authHook.ts`, `getAuth.ts` | `useAuth.ts` | React Hook rules require `use` prefix. |
+| **Interface** | `IButtonProps` | `ButtonProps` | TypeScript guidelines discourage `I` prefixes. |
+| **Constant** | `const api_timeout = 5000;` | `const API_TIMEOUT_MS = 5000;` | Global constants use SCREAMING_SNAKE_CASE with units. |
+| **Boolean State** | `const [active, setActive] = ...` | `const [isActive, setIsActive] = ...` | Boolean state must use `is`, `has`, or `can`. |
+| **Handler Prop** | `<Modal handleClose={...} />` | `<Modal onClose={...} />` | Props take `onEvent`, handlers use `handleEvent`. |
+
+<Callout type="tip">
+Enforce these naming conventions automatically in your editor. Our ESLint configuration includes `@typescript-eslint/naming-convention` rules that flag deviations directly in VS Code.
+</Callout>
+
+## Related
+
+- [Project Structure Overview](/docs/development/frontend/project-structure)
+- [Folder Conventions](/docs/development/frontend/project-structure/folder-conventions)
+- [Module Organization & Imports](/docs/development/frontend/project-structure/module-organization)
+- [Code Review Checklist](/docs/development/frontend/quality/code-review)
+

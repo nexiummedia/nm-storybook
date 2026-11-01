@@ -1,0 +1,297 @@
+---
+title: Project Setup & Scaffolding
+description: Standardized initialization procedure for Nexium Media Next.js client applications, including strict TypeScript, ESLint flat config, Prettier, and Husky git hooks.
+---
+
+Starting a greenfield client project requires adhering strictly to Nexium Media's baseline architectural blueprint. Consistent project structure across all engineering pods enables frictionless developer mobility, unifies CI/CD pipelines, and guarantees compliance with enterprise security and code quality gates.
+
+This guide details the complete bootstrapping procedure for a production-ready Next.js application using App Router, TypeScript, Tailwind CSS, and automated pre-commit verification.
+
+## Automated Scaffolding
+
+Bootstrap greenfield applications using Next.js CLI with company standard flags preselected:
+
+```bash
+npx create-next-app@latest client-app-portal \
+  --typescript \
+  --tailwind \
+  --eslint \
+  --app \
+  --src-dir false \
+  --import-alias "@/*" \
+  --use-npm
+```
+
+### Initial Post-Scaffold Folder Hierarchy
+
+```text
+client-app-portal/
+├── app/                  # Next.js App Router pages, layouts, and route handlers
+│   ├── favicon.ico
+│   ├── globals.css       # Root design tokens and Tailwind imports
+│   ├── layout.tsx        # Root HTML shell and global providers
+│   └── page.tsx          # Root index page
+├── components/           # Reusable UI component modules
+│   ├── ui/               # Design system primitives (Button, Input, Modal)
+│   └── layout/           # Global chrome (Navbar, Footer, Sidebar)
+├── lib/                  # Shared clients and third-party wrappers (supabase, api-client)
+├── types/                # Ambient and domain TypeScript definitions
+├── public/               # Unprocessed static assets (SVG, PNG, fonts)
+├── .editorconfig         # Indentation and line-ending normalization
+├── .env.example          # Environment variable template (committed)
+├── .env.local            # Local secrets and overrides (git-ignored)
+├── .gitignore            # Git exclusion rules
+├── eslint.config.mjs     # ESLint 9+ flat configuration
+├── next.config.ts        # Next.js build-time configuration
+├── package.json          # Manifest and npm scripts
+├── postcss.config.mjs    # PostCSS pipeline definition
+├── prettier.config.mjs   # Prettier code formatting rules
+├── tailwind.config.ts    # Tailwind theme extensions and token mappings
+└── tsconfig.json         # Strict TypeScript compiler options
+```
+
+## Strict TypeScript Configuration (`tsconfig.json`)
+
+Nexium Media mandates strict compiler settings to eliminate ambient `any` leaks, enforce exhaustive type checking, and require explicit optional handling:
+
+```json
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": false,
+    "skipLibCheck": true,
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+    "noImplicitThis": true,
+    "alwaysStrict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "forceConsistentCasingInFileNames": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": ["./*"]
+    }
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules"]
+}
+```
+
+<Callout type="tip">
+Enabling `"noUncheckedIndexedAccess": true` guarantees that array indexing operations return `T | undefined`, forcing engineers to guard against out-of-bounds runtime exceptions before accessing element properties.
+</Callout>
+
+## ESLint Flat Configuration (`eslint.config.mjs`)
+
+Modern Next.js projects at Nexium utilize ESLint 9+ flat configuration format:
+
+```javascript
+import { dirname } from "path";
+import { fileURLToPath } from "url";
+import { FlatCompat } from "@eslint/eslintrc";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+const compat = new FlatCompat({
+  baseDirectory: __dirname,
+});
+
+const eslintConfig = [
+  ...compat.extends("next/core-web-vitals", "next/typescript"),
+  {
+    rules: {
+      "@typescript-eslint/no-explicit-any": "error",
+      "@typescript-eslint/explicit-function-return-type": "off",
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        {
+          "argsIgnorePattern": "^_",
+          "varsIgnorePattern": "^_"
+        }
+      ],
+      "react/self-closing-comp": "error",
+      "no-console": ["warn", { "allow": ["warn", "error"] }]
+    }
+  }
+];
+
+export default eslintConfig;
+```
+
+## Prettier Configuration (`prettier.config.mjs`)
+
+Enforce automated formatting and Tailwind class sorting:
+
+```javascript
+/** @type {import("prettier").Config} */
+const config = {
+  semi: true,
+  singleQuote: false,
+  trailingComma: "all",
+  tabWidth: 2,
+  printWidth: 100,
+  arrowParens: "always",
+  endOfLine: "lf",
+  plugins: ["prettier-plugin-tailwindcss"],
+};
+
+export default config;
+```
+
+Install the Prettier Tailwind sorting plugin:
+
+```bash
+npm install -D prettier-plugin-tailwindcss
+```
+
+## Tailwind Configuration (`tailwind.config.ts`)
+
+Configure theme tokens and component scanning paths:
+
+```typescript
+import type { Config } from "tailwindcss";
+
+const config: Config = {
+  darkMode: ["class"],
+  content: [
+    "./pages/**/*.{js,ts,jsx,tsx,mdx}",
+    "./components/**/*.{js,ts,jsx,tsx,mdx}",
+    "./app/**/*.{js,ts,jsx,tsx,mdx}",
+  ],
+  theme: {
+    container: {
+      center: true,
+      padding: "2rem",
+      screens: {
+        "2xl": "1400px",
+      },
+    },
+    extend: {
+      colors: {
+        border: "hsl(var(--border))",
+        input: "hsl(var(--input))",
+        ring: "hsl(var(--ring))",
+        background: "hsl(var(--background))",
+        foreground: "hsl(var(--foreground))",
+        primary: {
+          DEFAULT: "hsl(var(--primary))",
+          foreground: "hsl(var(--primary-foreground))",
+        },
+        secondary: {
+          DEFAULT: "hsl(var(--secondary))",
+          foreground: "hsl(var(--secondary-foreground))",
+        },
+        destructive: {
+          DEFAULT: "hsl(var(--destructive))",
+          foreground: "hsl(var(--destructive-foreground))",
+        },
+        muted: {
+          DEFAULT: "hsl(var(--muted))",
+          foreground: "hsl(var(--muted-foreground))",
+        },
+      },
+      borderRadius: {
+        lg: "var(--radius)",
+        md: "calc(var(--radius) - 2px)",
+        sm: "calc(var(--radius) - 4px)",
+      },
+    },
+  },
+  plugins: [],
+};
+
+export default config;
+```
+
+## Git Hooks with Husky and lint-staged
+
+We enforce quality checks locally on every commit to prevent broken code or unformatted files from reaching remote CI runners.
+
+### 1. Installation
+
+```bash
+npm install -D husky lint-staged
+npx husky init
+```
+
+### 2. Configure `lint-staged` in `package.json`
+
+Add the following block to your `package.json`:
+
+```json
+{
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,css,scss}": [
+      "prettier --write"
+    ]
+  }
+}
+```
+
+### 3. Configure Pre-Commit Hook (`.husky/pre-commit`)
+
+```bash
+# .husky/pre-commit
+npx lint-staged
+npm run typecheck
+```
+
+<Callout type="warning">
+Do not use `git commit -n` (no-verify) to bypass Husky hooks. If a pre-commit check fails, address the underlying type error or lint violation immediately.
+</Callout>
+
+## Creating the First Feature Branch
+
+Never commit directly to `main` or `develop`. All development follows the Nexium Git Workflow:
+
+```bash
+# Ensure local develop is synchronized
+git checkout develop
+git pull origin develop
+
+# Create a feature branch following company naming conventions
+# Format: feature/<ticket-id>-<short-description>
+git checkout -b feature/NX-1042-user-auth-modal
+
+# Stage changes and commit using Conventional Commits
+git add .
+git commit -m "feat(auth): initialize authentication modal component and schema"
+
+# Push and set upstream tracking
+git push -u origin feature/NX-1042-user-auth-modal
+```
+
+## Related
+
+- [Getting Started Overview](/docs/development/frontend/getting-started)
+- [Folder Structure Conventions](/docs/development/frontend/project-structure/folder-conventions)
+- [Naming Conventions](/docs/development/frontend/project-structure/naming-conventions)
+- [Code Review Checklist](/docs/development/frontend/quality/code-review)
+

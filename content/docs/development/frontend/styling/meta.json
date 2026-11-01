@@ -1,0 +1,6 @@
+{
+  "title": "Styling",
+  "description": "Tailwind CSS v4, responsive layout strategies, design tokens, and fluid animations.",
+  "pages": ["index", "tailwind-css", "responsive-design", "design-tokens", "animations"]
+}
+

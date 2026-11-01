@@ -1,0 +1,196 @@
+---
+title: Development Environment
+description: Comprehensive workstation architecture, terminal configuration, browser profiling tools, and multi-service debugging workflows.
+---
+
+A high-throughput frontend engineering workflow relies on an optimized workstation environment. With over 100 developers collaborating across concurrent micro-frontends, headless CMS instances, and GraphQL/REST microservices, maintaining environment parity is critical.
+
+This guide provides configuration specifications for operating systems, terminals, containerized support services, browser inspection suites, and IDE debug runtimes.
+
+## Recommended Workstation Specifications
+
+Nexium Media equips engineers with standardized hardware designed to compile TypeScript abstract syntax trees and execute parallel headless browser suites without throttling:
+
+| Resource | Minimum Standard | Preferred Specification |
+| :--- | :--- | :--- |
+| **CPU Architecture** | Apple Silicon M2 / Intel Core i7 12th Gen | Apple Silicon M3 Pro / AMD Ryzen 9 7900 |
+| **RAM** | 32 GB LPDDR5 / DDR5 | 64 GB Unified Memory |
+| **Storage** | 512 GB NVMe SSD | 1 TB PCIe 4.0 NVMe |
+| **Monitors** | Dual 27" 4K @ 60Hz or single 34" UltraWide | 2x 27" 4K @ 120Hz (P3 Color Calibrated) |
+
+## Operating System Specific Guidelines
+
+### macOS
+- Use [Homebrew](https://brew.sh) for managing system utilities (`git`, `watchman`, `mkcert`, `jq`).
+- Verify Xcode Command Line Tools are initialized: `xcode-select --install`.
+- Ensure filesystem case-sensitivity matches CI (APFS case-insensitive is standard on macOS; beware of importing `Component` as `component` which works locally but fails on Linux CI).
+
+### Windows
+- Install **Windows Terminal** from the Microsoft Store.
+- While WSL2 (Ubuntu 22.04 LTS) is encouraged for native POSIX compatibility, native Windows 11 with PowerShell 7+ is fully supported when Git line-ending handling is configured properly:
+  ```powershell
+  git config --global core.autocrlf input
+  ```
+- Exclude project working directories (`C:\Users\<username>\Desktop\NM project\...`) from Windows Defender real-time scanning to avoid a 30–50% degradation in `npm ci` and Next.js SWC compilation speeds.
+
+### Linux (Ubuntu / Fedora)
+- Ensure inotify watcher limits are increased to prevent file watcher exhaustion in large Next.js monorepos:
+  ```bash
+  echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf && sudo sysctl -p
+  ```
+
+## Terminal & Shell Setup
+
+### macOS: Zsh with Oh My Zsh
+
+1. Install Oh My Zsh:
+   ```bash
+   sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+   ```
+2. Enable productivity plugins in `~/.zshrc`:
+   ```bash
+   plugins=(git zsh-autosuggestions zsh-syntax-highlighting npm node)
+   ```
+
+### Windows: Windows Terminal + PowerShell 7 Profile
+
+Add the following helper functions to your `$PROFILE` (`notepad $PROFILE`):
+
+```powershell
+# Fast Port Killer
+function Kill-Port($port) {
+    $proc = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -First 1
+    if ($proc) {
+        Stop-Process -Id $proc -Force
+        Write-Host "Killed process $proc listening on port $port" -ForegroundColor Green
+    } else {
+        Write-Host "No process found on port $port" -ForegroundColor Yellow
+    }
+}
+
+# Clean Workspace
+function Clean-Next {
+    Remove-Item -Recurse -Force .next -ErrorAction SilentlyContinue
+    Remove-Item -Recurse -Force node_modules -ErrorAction SilentlyContinue
+    npm ci
+}
+```
+
+## Docker for Local Auxiliary Services
+
+Frontend applications at Nexium Media frequently interact with local databases, headless CMS instances (Strapi / Payload), Redis cache layers, or mock OAuth identity providers.
+
+We use Docker Compose to run these support services without polluting the host operating system:
+
+```yaml
+# docker-compose.dev.yml
+version: "3.8"
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: nexium-pg-dev
+    environment:
+      POSTGRES_USER: nexium_dev
+      POSTGRES_PASSWORD: dev_insecure_password
+      POSTGRES_DB: client_portal_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: nexium-redis-dev
+    ports:
+      - "6379:6379"
+
+volumes:
+  pgdata:
+```
+
+Spin up background dependencies prior to running your frontend:
+
+```bash
+docker compose -f docker-compose.dev.yml up -d
+```
+
+## Browser DevTools Configuration
+
+Frontend engineers must configure Chrome or Edge with the following developer extensions:
+
+1. **React Developer Tools**: Enables inspection of React component hierarchies, hook state machines, and render reason profiling.
+2. **Redux / Zustand DevTools**: Required when inspecting client state stores and replaying state mutations.
+3. **Axe DevTools**: Automated accessibility checker for WCAG 2.1 AA compliance audits.
+
+### DevTools Profiler Best Practices
+
+- Enable **"Highlight updates when components render"** in React DevTools Settings to immediately identify unintentional re-render waterfalls.
+- Check **"Record why each component rendered while profiling"** under the Profiler tab to isolate unstable object reference and anonymous function props.
+
+## Debugging Setup in VS Code
+
+Create a `.vscode/launch.json` file in your repository root to configure unified full-stack debugging for Next.js App Router (handling both Node.js Server Components and browser Client Components):
+
+```json
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Next.js: Debug Server-Side",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "npm run dev"
+    },
+    {
+      "name": "Next.js: Debug Client-Side",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:3000",
+      "webRoot": "${workspaceFolder}"
+    },
+    {
+      "name": "Next.js: Debug Full Stack",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "npm run dev",
+      "serverReadyAction": {
+        "pattern": "- Local:.+(http://.+)",
+        "uriFormat": "%s",
+        "action": "debugWithChrome"
+      }
+    }
+  ]
+}
+```
+
+<Callout type="tip">
+Use the "Next.js: Debug Full Stack" target to set breakpoints simultaneously in your Server Component async loader functions (`app/dashboard/page.tsx`) and in interactive Client Component event handlers (`components/forms/SearchFilter.tsx`).
+</Callout>
+
+## Running Multiple Projects Simultaneously
+
+Nexium engineers routinely balance multiple microservices or frontends simultaneously (e.g., a customer portal on port 3000, an admin dashboard on port 3001, and a mock identity broker on port 4000).
+
+To prevent port collision crashes:
+
+```bash
+# Terminal 1: Customer Portal
+PORT=3000 npm run dev
+
+# Terminal 2: Admin Dashboard
+PORT=3001 npm run dev
+```
+
+On Windows PowerShell:
+```powershell
+$env:PORT=3001; npm run dev
+```
+
+For long-term multi-project management, configure your `.env.local` with distinct port bindings or use reverse proxy tooling such as Caddy or Traefik with `.localhost` custom subdomains (`portal.localhost`, `admin.localhost`).
+
+## Related
+
+- [Installation & Toolchain Guide](/docs/development/frontend/getting-started/installation)
+- [Project Setup Standards](/docs/development/frontend/getting-started/project-setup)
+- [Debugging Workflows Deep Dive](/docs/development/frontend/workflows/debugging)
+- [Performance Optimization](/docs/development/frontend/quality/performance)

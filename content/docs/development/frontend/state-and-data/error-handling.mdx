@@ -1,0 +1,197 @@
+---
+title: Error Handling Architecture
+description: Comprehensive error handling, React error boundary placement, Sentry error monitoring, retry mechanisms, and resilient UI error states.
+---
+
+In production web applications, failures are inevitable: remote APIs fail, networks disconnect mid-flight, and unanticipated data states cause runtime exceptions. Robust engineering is defined not by the total absence of errors, but by how gracefully the application isolates failures, alerts monitoring systems, and guides the user toward recovery.
+
+This guide details our error classification hierarchy, React Error Boundary placement, production telemetry with Sentry, and resilient user interface states.
+
+## Error Classification Matrix
+
+We partition errors into five distinct operational domains:
+
+| Category | Typical Causes | Desired User Experience | Telemetry Level |
+| :--- | :--- | :--- | :--- |
+| **Network Errors** | Offline client, DNS failure, dropped connection. | Persistent banner: "You are offline. Retrying..." | Warning (Client local) |
+| **HTTP 4xx Client Errors** | Invalid form payload, expired authentication, 404 not found. | Contextual field errors or redirect to login. | Info / Warning |
+| **HTTP 5xx Server Errors** | Backend panic, database outage, downstream gateway timeout. | Non-blocking error panel with a "Retry" button. | **Error (Sentry Alert)** |
+| **Runtime JS Exceptions** | Undefined property access, reconciliation crashes. | Isolated component Error Boundary fallback. | **Critical (Sentry Alert)** |
+| **Schema Validation** | Backend returned data violating expected Zod contract. | Graceful degradation; fallback to empty state. | **Error (Sentry Alert)** |
+
+## React Error Boundaries with `react-error-boundary`
+
+In React, an unhandled JavaScript exception inside any component's render lifecycle unmounts the **entire** component tree by default, resulting in a blank white screen. Error boundaries catch these exceptions and preserve the rest of the application shell.
+
+We standardize on the industry-standard `react-error-boundary` package:
+
+```bash
+npm install react-error-boundary
+```
+
+### Granular Error Boundary Placement
+
+Do not rely solely on a single root-level error boundary. Wrap individual cards, widgets, and sidebars so that a failure in one panel does not break the entire dashboard:
+
+```tsx
+// app/dashboard/page.tsx
+"use client";
+
+import { ErrorBoundary } from "react-error-boundary";
+import { AnalyticsChart } from "@/features/analytics/components/AnalyticsChart";
+import { RecentActivities } from "@/features/activity/components/RecentActivities";
+import { ComponentErrorFallback } from "@/components/feedback/ComponentErrorFallback";
+
+export default function DashboardPage() {
+  return (
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      {/* Chart widget isolated in its own boundary */}
+      <div className="lg:col-span-2">
+        <ErrorBoundary
+          FallbackComponent={ComponentErrorFallback}
+          onReset={() => {
+            // Reset query cache or component state on user retry
+          }}
+        >
+          <AnalyticsChart />
+        </ErrorBoundary>
+      </div>
+
+      {/* Activity sidebar isolated in its own boundary */}
+      <div>
+        <ErrorBoundary FallbackComponent={ComponentErrorFallback}>
+          <RecentActivities />
+        </ErrorBoundary>
+      </div>
+    </div>
+  );
+}
+```
+
+### Standard Error Fallback Component
+
+```tsx
+// components/feedback/ComponentErrorFallback.tsx
+"use client";
+
+import { type FallbackProps } from "react-error-boundary";
+import { Button } from "@/components/ui/Button";
+
+export function ComponentErrorFallback({ error, resetErrorBoundary }: FallbackProps) {
+  return (
+    <div
+      role="alert"
+      className="flex flex-col items-center justify-center rounded-lg border border-red-200 bg-red-50/50 p-6 text-center"
+    >
+      <div className="rounded-full bg-red-100 p-3 text-red-600">
+        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+        </svg>
+      </div>
+      <h3 className="mt-3 text-base font-semibold text-slate-900">Failed to load content</h3>
+      <p className="mt-1 text-sm text-slate-600 max-w-sm">
+        An error occurred while loading this section. Our engineering team has been notified.
+      </p>
+      {process.env.NODE_ENV !== "production" && (
+        <pre className="mt-3 max-h-32 overflow-auto text-left text-xs text-red-700 bg-red-100 p-2 rounded">
+          {error.message}
+        </pre>
+      )}
+      <Button variant="outline" size="sm" onClick={resetErrorBoundary} className="mt-4">
+        Try Again
+      </Button>
+    </div>
+  );
+}
+```
+
+## Handling Errors in Server Actions
+
+Server Actions must return errors as serializable objects rather than throwing uncaught server exceptions:
+
+```tsx
+// app/actions/update-profile.ts
+"use server";
+
+import { z } from "zod";
+import * as Sentry from "@sentry/nextjs";
+
+export type ActionResponse<T> =
+  | { success: true; data: T }
+  | { success: false; error: string; fieldErrors?: Record<string, string[]> };
+
+export async function updateProfile(formData: FormData): Promise<ActionResponse<{ id: string }>> {
+  try {
+    const rawData = Object.fromEntries(formData);
+    const parsed = ProfileSchema.safeParse(rawData);
+
+    if (!parsed.success) {
+      return {
+        success: false,
+        error: "Validation failed. Please verify your entries.",
+        fieldErrors: parsed.error.flatten().fieldErrors,
+      };
+    }
+
+    const updated = await db.user.update({
+      where: { id: parsed.data.userId },
+      data: parsed.data,
+    });
+
+    return { success: true, data: { id: updated.id } };
+  } catch (err: unknown) {
+    // Capture to Sentry with context
+    Sentry.captureException(err, { extra: { action: "updateProfile" } });
+
+    // Never leak raw SQL or stack traces to the user
+    return {
+      success: false,
+      error: "Unable to update profile due to an internal server error. Please try again later.",
+    };
+  }
+}
+```
+
+## Production Error Monitoring with Sentry
+
+All Nexium client applications integrate `@sentry/nextjs`:
+
+```typescript
+// instrumentation.ts
+import * as Sentry from "@sentry/nextjs";
+
+export function register() {
+  if (process.env.NEXT_RUNTIME === "nodejs") {
+    Sentry.init({
+      dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
+      tracesSampleRate: 0.1,
+      environment: process.env.NEXT_PUBLIC_APP_ENV,
+    });
+  }
+
+  if (process.env.NEXT_RUNTIME === "edge") {
+    Sentry.init({
+      dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
+      tracesSampleRate: 0.1,
+    });
+  }
+}
+```
+
+<Callout type="warning">
+Ensure Sentry's `beforeSend` hook scrubs sensitive personal identifiable information (PII) such as passwords, auth tokens, credit cards, and social security numbers before errors leave the user's browser.
+</Callout>
+
+## Common Mistakes & Anti-Patterns
+
+1. **Swallowing Errors Silently**: Using empty catch blocks (`try { ... } catch {}`) makes production debugging nearly impossible. Always log to Sentry or display an appropriate UI state.
+2. **Exposing Raw Error Messages**: Rendering `error.message` directly often reveals database table names, SQL queries, or internal file paths to users, creating a security vulnerability.
+3. **Missing Retry Functionality**: Showing an error message without giving the user a way to retry forces them to refresh the entire browser page.
+
+## Related
+
+- [State & Data Architecture Overview](/docs/development/frontend/state-and-data)
+- [Typed API Client Integration](/docs/development/frontend/state-and-data/api-integration)
+- [Security Guidelines](/docs/development/frontend/quality/security)
+- [Debugging Workflows Deep Dive](/docs/development/frontend/workflows/debugging)
+

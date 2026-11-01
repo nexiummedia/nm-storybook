@@ -1,0 +1,188 @@
+---
+title: Build & Deployment Pipelines
+description: Production compilation architectures, Vercel deployments, GitHub Actions CI/CD workflows, zero-downtime rollbacks, and health checks.
+---
+
+Delivering reliable web applications at scale requires automated, repeatable build and deployment pipelines. Nexium Media uses automated Continuous Integration and Continuous Deployment (CI/CD) pipelines to compile, test, and deploy applications to global edge networks with zero downtime.
+
+This guide details Next.js production build artifacts, Vercel edge deployment workflows, GitHub Actions CI pipelines, and instant rollback runbooks.
+
+## Production Build Compilation (`next build`)
+
+Executing `npm run build` triggers the Next.js compiler (Turbopack/SWC) to generate optimized production artifacts in the `.next/` directory:
+
+```bash
+npm run build
+```
+
+### Understanding the Next.js Build Output
+
+The build output summarizes the rendering strategy for each route in your application:
+
+```text
+Route (app)                              Size     First Load JS
+┌ ○ /                                    5.42 kB        89.2 kB
+├ ○ /_not-found                          871 B          84.6 kB
+├ λ /api/auth/[...nextauth]              0 B                0 B
+├ ● /campaigns/[id]                      3.12 kB        94.8 kB
+│   ├ /campaigns/q1-launch
+│   └ /campaigns/brand-refresh
+└ ƒ /dashboard                           8.14 kB         112 kB
++ First Load JS shared by all            78.3 kB
+  ├ chunks/244-8d9e7284.js               45.2 kB
+  ├ chunks/main-app-9c82.js              31.1 kB
+  └ other shared chunks (total)          2.0 kB
+
+○  (Static)   prerendered as static content
+●  (SSG)      prerendered as static HTML (uses generateStaticParams)
+ƒ  (Dynamic)  server-rendered on demand (uses dynamic headers, cookies, no-store)
+λ  (Server)   serverless route handler
+```
+
+- **Static (`○`)**: Rendered to pure HTML at build time; served directly from edge CDN caches with zero server computation.
+- **SSG (`●`)**: Prerendered using data fetched at build time via `generateStaticParams`.
+- **Dynamic (`ƒ`)**: Rendered on the server on every request because the route consumes request cookies, search params, or uncached data fetches.
+
+<Callout type="tip">
+Aim to keep marketing pages, documentation, and blog posts strictly **Static (`○`)** or **SSG (`●`)**. Reserve **Dynamic (`ƒ`)** for authenticated dashboard views that require live, user-specific data.
+</Callout>
+
+## Complete GitHub Actions CI/CD Pipeline
+
+Nexium Media repositories use GitHub Actions to enforce automated testing, linting, and deployment gates on every branch and pull request:
+
+```yaml
+# .github/workflows/deploy.yml
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  verify:
+    name: Lint, Typecheck & Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Codebase
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js Runtime
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.12.0
+          cache: "npm"
+
+      - name: Clean Install Dependencies
+        run: npm ci
+
+      - name: Code Style & Lint
+        run: npm run lint
+
+      - name: Strict TypeScript Verification
+        run: npm run typecheck
+
+      - name: Execute Automated Unit & Integration Tests
+        run: npm run test -- --coverage --maxWorkers=2
+
+      - name: Upload Test Coverage Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+
+  build:
+    name: Production Build Verification
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.12.0
+          cache: "npm"
+      - run: npm ci
+      - run: npm run build
+        env:
+          NEXT_PUBLIC_APP_ENV: production
+          NEXT_PUBLIC_API_BASE_URL: https://api.nexiummedia.com/v1
+
+  deploy-preview:
+    name: Deploy Vercel Preview
+    if: github.event_name == 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy to Vercel Preview
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          vercel-args: "--preview"
+```
+
+## Vercel Deployment Architecture
+
+Nexium Media client applications are primarily hosted on **Vercel**:
+
+### 1. Preview Deployments
+Every pull request automatically generates an isolated, immutable preview deployment URL (e.g., `client-portal-git-feature-nx-104-nexium.vercel.app`). This allows designers, product managers, and clients to review changes on a live URL before code is merged.
+
+### 2. Production Deployments
+Merging into the `main` branch triggers an automated zero-downtime deployment to production:
+- Assets are deployed across Vercel's global edge network.
+- Serverless and Edge functions are instantiated with cold-start optimization.
+- Traffic cuts over atomically once the new deployment passes health checks.
+
+### 3. Environment Variable Scoping in Vercel
+Configure environment variables across three distinct scopes in the Vercel Project Dashboard:
+- **Production**: Live database credentials, production payment keys, public domain URLs.
+- **Preview**: Staging database credentials, test payment sandbox keys.
+- **Development**: Fallback values for developers using `vercel env pull`.
+
+## Rollback Procedures: Zero-Downtime Recovery
+
+In the event an unforeseen bug or downstream service failure impacts production:
+
+### Option 1: Instant Vercel Rollback (Preferred)
+1. Open the **Vercel Project Dashboard**.
+2. Navigate to the **Deployments** tab.
+3. Locate the last known healthy production deployment.
+4. Click the three dots (`...`) and select **Instant Rollback**.
+5. Traffic cuts over to the previous deployment immediately (within seconds) without rebuilding.
+
+### Option 2: Git Tag / Hotfix Deployment
+```bash
+# Checkout the healthy production release tag
+git checkout v2.4.1
+
+# Create an emergency hotfix branch
+git checkout -b hotfix/revert-unstable-payment-gateway
+
+# Revert problematic commit
+git revert <problematic-commit-sha>
+
+# Push to trigger CI/CD pipeline
+git push origin hotfix/revert-unstable-payment-gateway
+```
+
+## Post-Deployment Health Verification
+
+After every production deployment, the engineering team monitors release stability:
+
+1. **Sentry Error Stream**: Monitor the Sentry dashboard for spikes in uncaught runtime exceptions or new error signatures associated with the release tag.
+2. **Core Web Vitals Telemetry**: Confirm LCP, INP, and CLS scores remain within acceptable thresholds on live user traffic.
+3. **Uptime Monitoring**: Verify automated ping checks (e.g., BetterStack, Datadog) report HTTP 200 responses on `/api/health`.
+
+## Related
+
+- [Engineering Workflows Overview](/docs/development/frontend/workflows)
+- [Troubleshooting Runbook](/docs/development/frontend/workflows/troubleshooting)
+- [Debugging Workflows Deep Dive](/docs/development/frontend/workflows/debugging)
+- [Code Review Standards](/docs/development/frontend/quality/code-review)
+

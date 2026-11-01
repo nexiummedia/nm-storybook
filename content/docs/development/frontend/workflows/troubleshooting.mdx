@@ -1,0 +1,216 @@
+---
+title: Frontend Troubleshooting Runbook
+description: Step-by-step diagnostic and remediation procedures for common frontend build failures, hydration mismatches, and runtime issues.
+---
+
+This runbook provides actionable solutions for common technical issues encountered during development, testing, and deployment across Nexium Media frontend codebases. When encountering an error, consult this guide before escalating to an engineering lead.
+
+## Quick Index of Common Issues
+
+1. [Module Not Found / Path Resolution Errors](#1-module-not-found-or-cannot-resolve-path)
+2. [React 18 Hydration Mismatch](#2-react-18-hydration-mismatch)
+3. [Tailwind CSS Classes Not Applying](#3-tailwind-classes-not-applying)
+4. [API 401 Unauthorized / CORS Errors in Local Development](#4-api-401-unauthorized-or-cors-errors)
+5. [TypeScript Errors After Upgrading Dependencies](#5-typescript-errors-after-package-upgrades)
+6. [`useEffect` Invoking Twice in Development](#6-useeffect-running-twice-in-development)
+7. [Jest Memory Leak Warnings & Slow Test Execution](#7-jest-memory-leak-warnings)
+8. [Next.js Images Failing to Optimize or Crashing](#8-nextimage-fails-to-optimize-or-crashes)
+9. [Build Passes Locally but Fails in CI](#9-build-passes-locally-but-fails-in-github-actions-ci)
+10. [Port 3000 Collision (`EADDRINUSE`)](#10-port-collision-eaddrinuse-3000)
+
+---
+
+## 1. Module Not Found or "Cannot Resolve Path"
+
+### Symptom
+```text
+Module not found: Can't resolve '@/components/ui/Button'
+```
+
+### Root Causes & Solutions
+- **Missing Path Alias in `tsconfig.json`**: Verify that `paths` contains `"@/*": ["./*"]` (or `"@/*": ["./src/*"]` if using a `src/` directory).
+- **Case-Sensitivity Mismatch**: macOS is case-insensitive, while Linux CI runners are case-sensitive. Importing `@/components/ui/button` when the file is named `Button.tsx` works locally on Mac but fails in CI. Ensure file casing matches the import statement exactly.
+- **Stale TypeScript Build Cache**:
+  ```bash
+  rm -rf .next tsconfig.tsbuildinfo
+  npm run dev
+  ```
+
+---
+
+## 2. React 18 Hydration Mismatch
+
+### Symptom
+```text
+Error: Hydration failed because the initial UI does not match what was rendered on the server.
+Warning: Text content did not match. Server: "10:00 AM" Client: "10:01 AM"
+```
+
+### Root Causes & Solutions
+- **Dynamic Timestamps or Random Values**: Rendering `Date.now()`, `new Date()`, or `Math.random()` during server rendering will not match the client. Defer rendering dynamic values until after mount using a `useEffect`:
+  ```tsx
+  const [formattedDate, setFormattedDate] = useState<string | null>(null);
+  useEffect(() => {
+    setFormattedDate(formatDate(post.date));
+  }, [post.date]);
+  return <span>{formattedDate ?? "..."}</span>;
+  ```
+- **Invalid HTML Structure**: Browsers automatically correct invalid nesting (such as `<p>` inside another `<p>`, or `<tr>` without a `<tbody>`), which alters the DOM tree before React hydraton. Check your markup for invalid nesting.
+- **Browser Extensions**: Password managers and ad-blockers can inject DOM nodes. Test the page in an Incognito window with extensions disabled.
+
+---
+
+## 3. Tailwind Classes Not Applying
+
+### Symptom
+Tailwind utility classes written in JSX produce no visual effect, or styles disappear after building for production.
+
+### Root Causes & Solutions
+- **Missing Path in `tailwind.config.ts` `content` Array**:
+  ```typescript
+  // tailwind.config.ts
+  content: [
+    "./app/**/*.{js,ts,jsx,tsx}",
+    "./components/**/*.{js,ts,jsx,tsx}",
+    "./features/**/*.{js,ts,jsx,tsx}", // Verify custom folders are listed!
+  ],
+  ```
+- **Dynamic String Construction**: Tailwind extracts classes at build time using regex. Strings assembled dynamically (`text-${color}-500`) are not detected. Replace them with full class names in a lookup map:
+  ```typescript
+  // Correct
+  const colorClasses = { red: "text-red-500", blue: "text-blue-500" };
+  ```
+- **Class Specificity Conflicts**: If two conflicting Tailwind classes are applied, use the `cn()` utility (`twMerge`) to resolve the conflict predictably.
+
+---
+
+## 4. API 401 Unauthorized or CORS Errors
+
+### Symptom
+```text
+Access to fetch at 'https://api.backend.com' from origin 'http://localhost:3000' has been blocked by CORS policy.
+```
+
+### Root Causes & Solutions
+- **Calling Third-Party API Directly from the Browser**: Browsers enforce CORS policies. Route the request through a Next.js Server Component, Server Action, or Route Handler (`app/api/proxy/route.ts`), which runs on the server and is not restricted by browser CORS policies.
+- **Expired Development Token**: Check your `.env.local` to verify `NEXT_PUBLIC_API_BASE_URL` points to the correct local or staging environment, and re-authenticate to obtain a fresh token.
+
+---
+
+## 5. TypeScript Errors After Package Upgrades
+
+### Symptom
+Type errors occur in third-party libraries or standard React types after running `npm update`.
+
+### Root Causes & Solutions
+- **Conflicting React Types**: Multiple versions of `@types/react` in `node_modules` can cause subtle type mismatches. Check for duplicate versions:
+  ```bash
+  npm ls @types/react
+  ```
+  If duplicates exist, deduplicate them:
+  ```bash
+  npm dedupe
+  ```
+- **Clear Compiler Cache**:
+  ```bash
+  rm -rf node_modules/.cache tsconfig.tsbuildinfo
+  npx tsc --noEmit
+  ```
+
+---
+
+## 6. `useEffect` Running Twice in Development
+
+### Symptom
+`console.log` statements inside `useEffect` fire twice, or network requests trigger twice during local development.
+
+### Root Causes & Solutions
+- **React 18 Strict Mode Behavior**: This is intentional. In development mode with `<React.StrictMode>` enabled, React unmounts and remounts components to verify that cleanup functions correctly handle side effects and prevent memory leaks.
+- **Verification**: This double-invoke behavior **only occurs in development** and does not run twice in production builds. Ensure your effect includes a cleanup function that cancels subscriptions, timers, or aborts ongoing fetch requests.
+
+---
+
+## 7. Jest Memory Leak Warnings
+
+### Symptom
+```text
+A worker process has failed to exit gracefully and has been force exited. This is likely caused by a memory leak in your code.
+```
+
+### Root Causes & Solutions
+- **Timers Left Running**: Missing `jest.useRealTimers()` or active intervals in tests.
+- **Unclosed MSW Server Interceptors**: Ensure `afterAll(() => server.close())` is defined in `jest.setup.ts`.
+- **Missing Mock Cleanup**: Add `afterEach(() => { jest.clearAllMocks(); jest.restoreAllMocks(); });` to restore mocked implementations.
+- **Worker Concurrency**: In CI environments, limit worker processes:
+  ```bash
+  jest --maxWorkers=2 --logHeapUsage
+  ```
+
+---
+
+## 8. `next/image` Fails to Optimize or Crashes
+
+### Symptom
+```text
+Error: Invalid src prop on `next/image`, hostname "images.unsplash.com" is not configured under images in your `next.config.js`
+```
+
+### Root Causes & Solutions
+- **Unconfigured Remote Domain**: Next.js requires remote image domains to be declared in `next.config.ts` to prevent open-redirect vulnerabilities:
+  ```typescript
+  // next.config.ts
+  const nextConfig = {
+    images: {
+      remotePatterns: [
+        {
+          protocol: "https",
+          hostname: "images.unsplash.com",
+        },
+        {
+          protocol: "https",
+          hostname: "**.nexiummedia.com",
+        },
+      ],
+    },
+  };
+  ```
+
+---
+
+## 9. Build Passes Locally but Fails in GitHub Actions CI
+
+### Root Causes & Solutions
+- **Missing CI Environment Variables**: Build-time environment variables used in `next.config.ts` must be declared in GitHub Repository Secrets and forwarded to the CI job in `.github/workflows/deploy.yml`.
+- **Operating System Case Sensitivity**: Remember that Windows and macOS filesystems are case-insensitive, while GitHub Actions Ubuntu runners are case-sensitive. Verify all import paths match on-disk file casing.
+- **Node.js Version Mismatch**: Confirm the `actions/setup-node` step in CI matches the version specified in the project's `.nvmrc` (`20.12.0 LTS`).
+
+---
+
+## 10. Port Collision (`EADDRINUSE :::3000`)
+
+### Remediation
+
+#### Windows PowerShell
+```powershell
+Get-Process -Id (Get-NetTCPConnection -LocalPort 3000).OwningProcess | Stop-Process -Force
+```
+
+#### macOS / Linux
+```bash
+lsof -ti :3000 | xargs kill -9
+```
+
+Alternatively, launch the development server on a different port:
+```bash
+npm run dev -- -p 3005
+```
+
+---
+
+## Related
+
+- [Engineering Workflows Overview](/docs/development/frontend/workflows)
+- [Local Development Workflows](/docs/development/frontend/workflows/local-development)
+- [Debugging Workflows Deep Dive](/docs/development/frontend/workflows/debugging)
+- [Build & Deployment Pipelines](/docs/development/frontend/workflows/build-and-deployment)
+

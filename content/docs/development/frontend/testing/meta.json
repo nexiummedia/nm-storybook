@@ -1,0 +1,6 @@
+{
+  "title": "Testing",
+  "description": "Unit testing with Jest, integration testing with MSW, and end-to-end automation with Playwright.",
+  "pages": ["index", "unit-testing", "integration-testing", "end-to-end-testing"]
+}
+

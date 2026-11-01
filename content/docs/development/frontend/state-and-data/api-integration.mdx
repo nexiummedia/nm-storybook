@@ -1,0 +1,260 @@
+---
+title: Typed API Client & Integration
+description: Standards for building type-safe API clients, Zod payload validation, authentication interceptors, token refresh flows, and error normalization.
+---
+
+Frontend applications at Nexium Media communicate with diverse backend services, including internal Node/Go microservices, third-party REST APIs, GraphQL endpoints, and serverless edge functions. Calling native `fetch` directly throughout component trees leads to duplicate header logic, fragmented error handling, unvalidated payloads, and hardcoded URLs.
+
+This guide details our architecture for creating a centralized, type-safe API client with automatic token attachment, 401 refresh handling, Zod boundary validation, and normalized errors.
+
+## Normalized API Error Union
+
+API calls can fail across several distinct fault domains. We model these possibilities using a **discriminated union**:
+
+```typescript
+// types/api-errors.ts
+export type ApiError =
+  | { kind: "NETWORK_ERROR"; message: string }
+  | { kind: "HTTP_ERROR"; status: number; message: string; details?: unknown }
+  | { kind: "VALIDATION_ERROR"; message: string; issues: Record<string, string[]> }
+  | { kind: "UNAUTHORIZED"; message: string };
+
+export class ApplicationApiError extends Error {
+  constructor(public readonly error: ApiError) {
+    super(error.message);
+    this.name = "ApplicationApiError";
+  }
+}
+```
+
+## Centralized Typed API Client
+
+Below is our production API client wrapper, featuring automatic authentication header injection, 401 token refresh retry, and Zod schema parsing:
+
+```typescript
+// lib/api-client.ts
+import { z } from "zod";
+import { ApplicationApiError } from "@/types/api-errors";
+
+interface RequestOptions extends Omit<RequestInit, "body"> {
+  body?: unknown;
+  params?: Record<string, string | number | boolean | undefined>;
+  schema?: z.ZodType<unknown>;
+}
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "https://api.nexiummedia.com/v1";
+
+class ApiClient {
+  private async getAccessToken(): Promise<string | null> {
+    // Read short-lived token from secure storage or cookie
+    if (typeof window === "undefined") return null;
+    return localStorage.getItem("auth_access_token");
+  }
+
+  private async refreshAccessToken(): Promise<string | null> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+        method: "POST",
+        credentials: "include", // Transmits httpOnly refresh token cookie
+      });
+      if (!response.ok) return null;
+      const data = await response.json();
+      localStorage.setItem("auth_access_token", data.accessToken);
+      return data.accessToken;
+    } catch {
+      return null;
+    }
+  }
+
+  public async request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
+    const { body, params, schema, headers: customHeaders, ...customConfig } = options;
+
+    // 1. Build Query Parameters
+    const url = new URL(`${API_BASE_URL}${endpoint}`);
+    if (params) {
+      Object.entries(params).forEach(([key, val]) => {
+        if (val !== undefined) url.searchParams.append(key, String(val));
+      });
+    }
+
+    // 2. Attach Authorization Headers
+    let token = await this.getAccessToken();
+    const headers = new Headers(customHeaders);
+    if (!headers.has("Content-Type") && !(body instanceof FormData)) {
+      headers.set("Content-Type", "application/json");
+    }
+    if (token) {
+      headers.set("Authorization", `Bearer ${token}`);
+    }
+
+    const config: RequestInit = {
+      ...customConfig,
+      headers,
+      body: body instanceof FormData ? body : body ? JSON.stringify(body) : undefined,
+    };
+
+    // 3. Execute HTTP Call
+    let response: Response;
+    try {
+      response = await fetch(url.toString(), config);
+    } catch (networkErr: unknown) {
+      throw new ApplicationApiError({
+        kind: "NETWORK_ERROR",
+        message: networkErr instanceof Error ? networkErr.message : "Network unavailable.",
+      });
+    }
+
+    // 4. Handle 401 Unauthorized & Attempt Token Refresh
+    if (response.status === 401) {
+      token = await this.refreshAccessToken();
+      if (token) {
+        headers.set("Authorization", `Bearer ${token}`);
+        response = await fetch(url.toString(), { ...config, headers });
+      } else {
+        throw new ApplicationApiError({
+          kind: "UNAUTHORIZED",
+          message: "Session expired. Please log in again.",
+        });
+      }
+    }
+
+    // 5. Check Non-2xx HTTP Statuses
+    if (!response.ok) {
+      const errorBody = await response.json().catch(() => null);
+      throw new ApplicationApiError({
+        kind: "HTTP_ERROR",
+        status: response.status,
+        message: errorBody?.message || response.statusText,
+        details: errorBody,
+      });
+    }
+
+    // 6. Parse JSON Payload
+    const rawPayload: unknown = await response.json();
+
+    // 7. Validate with Zod Schema (if supplied)
+    if (schema) {
+      const parsed = schema.safeParse(rawPayload);
+      if (!parsed.success) {
+        throw new ApplicationApiError({
+          kind: "VALIDATION_ERROR",
+          message: "API response payload violated schema contract.",
+          issues: parsed.error.flatten().fieldErrors,
+        });
+      }
+      return parsed.data as T;
+    }
+
+    return rawPayload as T;
+  }
+
+  public get<T>(endpoint: string, options?: RequestOptions): Promise<T> {
+    return this.request<T>(endpoint, { ...options, method: "GET" });
+  }
+
+  public post<T>(endpoint: string, body: unknown, options?: RequestOptions): Promise<T> {
+    return this.request<T>(endpoint, { ...options, method: "POST", body });
+  }
+
+  public put<T>(endpoint: string, body: unknown, options?: RequestOptions): Promise<T> {
+    return this.request<T>(endpoint, { ...options, method: "PUT", body });
+  }
+
+  public delete<T>(endpoint: string, options?: RequestOptions): Promise<T> {
+    return this.request<T>(endpoint, { ...options, method: "DELETE" });
+  }
+}
+
+export const apiClient = new ApiClient();
+```
+
+## Complete Resource Module: Users Resource
+
+Encapsulate all endpoints for a given domain entity into a dedicated service module:
+
+```typescript
+// services/user-service.ts
+import { apiClient } from "@/lib/api-client";
+import { z } from "zod";
+
+export const UserSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  email: z.string().email(),
+  role: z.enum(["admin", "member", "guest"]),
+  createdAt: z.string().datetime(),
+});
+
+export const UserListSchema = z.array(UserSchema);
+
+export type User = z.infer<typeof UserSchema>;
+export type CreateUserPayload = Omit<User, "id" | "createdAt">;
+export type UpdateUserPayload = Partial<CreateUserPayload>;
+
+export const userService = {
+  // List with optional pagination
+  list: (params?: { page?: number; limit?: number }) => {
+    return apiClient.get<User[]>("/users", {
+      params,
+      schema: UserListSchema,
+    });
+  },
+
+  // Get by ID
+  getById: (userId: string) => {
+    return apiClient.get<User>(`/users/${userId}`, {
+      schema: UserSchema,
+    });
+  },
+
+  // Create
+  create: (payload: CreateUserPayload) => {
+    return apiClient.post<User>("/users", payload, {
+      schema: UserSchema,
+    });
+  },
+
+  // Update
+  update: (userId: string, payload: UpdateUserPayload) => {
+    return apiClient.put<User>(`/users/${userId}`, payload, {
+      schema: UserSchema,
+    });
+  },
+
+  // Delete
+  delete: (userId: string) => {
+    return apiClient.delete<{ success: boolean }>(`/users/${userId}`);
+  },
+
+  // File Upload via FormData
+  uploadAvatar: (userId: string, file: File) => {
+    const formData = new FormData();
+    formData.append("avatar", file);
+
+    return apiClient.post<{ avatarUrl: string }>(`/users/${userId}/avatar`, formData);
+  },
+};
+```
+
+<Callout type="tip">
+When uploading binary files via `FormData`, never set the `Content-Type` header manually. The browser must set it automatically along with the required boundary delimiter string (`multipart/form-data; boundary=...`).
+</Callout>
+
+## Code Generation from OpenAPI / Swagger
+
+On projects with well-maintained OpenAPI backend specifications, use `openapi-typescript` to generate strict TypeScript interfaces automatically:
+
+```bash
+# Add to package.json scripts
+npx openapi-typescript https://api.nexiummedia.com/swagger/v1/swagger.json -o ./types/api-schema.d.ts
+```
+
+This guarantees 100% type alignment between frontend and backend contracts whenever the backend updates its schemas.
+
+## Related
+
+- [State & Data Architecture Overview](/docs/development/frontend/state-and-data)
+- [Data Fetching & Server Cache](/docs/development/frontend/state-and-data/data-fetching)
+- [Error Handling Architecture](/docs/development/frontend/state-and-data/error-handling)
+- [Security Guidelines](/docs/development/frontend/quality/security)
+

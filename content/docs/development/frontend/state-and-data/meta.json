@@ -1,0 +1,6 @@
+{
+  "title": "State and Data",
+  "description": "State management paradigms, TanStack Query, server fetching, and robust error handling.",
+  "pages": ["index", "state-management", "data-fetching", "api-integration", "error-handling"]
+}
+

@@ -1,10 +1,16 @@
 {
-  "title": "Frontend",
-  "description": "Frontend architecture, components, and styling conventions",
+  "title": "Frontend Engineering",
+  "description": "Guidelines and reference for frontend development at Nexium Media.",
   "pages": [
     "index",
+    "getting-started",
+    "fundamentals",
     "project-structure",
-    "components"
+    "ui-components",
+    "styling",
+    "state-and-data",
+    "testing",
+    "quality",
+    "workflows"
   ]
 }
-

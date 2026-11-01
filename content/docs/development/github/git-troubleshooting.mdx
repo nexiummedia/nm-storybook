@@ -1,0 +1,61 @@
+---
+title: "Git Troubleshooting"
+description: "Common Git issues and their solutions."
+---
+
+# Git Troubleshooting
+
+<Callout type="warning">
+These are frequent problems developers encounter. Use the solutions below before opening an issue.
+</Callout>
+
+## 1. Authentication Failed
+
+**Symptoms**: `remote: Authentication failed` when pushing.
+
+**Solution**:
+- Verify you are using the correct GitHub account.
+- Ensure your SSH key is added to your GitHub account (`ssh -T git@github.com`).
+- For HTTPS, use a personal access token (PAT) with `repo` scope instead of password.
+
+## 2. Merge Conflicts
+
+**Symptoms**: `error: could not apply ...` during `git rebase` or `git merge`.
+
+**Solution**:
+- Open the conflicting files, locate `<<<<<<`, `======`, `>>>>>>` markers.
+- Resolve manually, then `git add <file>` and continue the operation (`git rebase --continue` or commit the merge).
+- Run tests to confirm nothing broke.
+
+## 3. Detached HEAD State
+
+**Symptoms**: You are on `HEAD` detached at a commit and cannot push.
+
+**Solution**:
+- Create a new branch from the current commit: `git checkout -b <new-branch>`.
+- Push the new branch to remote: `git push -u origin <new-branch>`.
+
+## 4. Large Files Rejected
+
+**Symptoms**: `remote: error: File exceeds size limit`.
+
+**Solution**:
+- Use Git LFS for large assets (`git lfs install`, `git lfs track "*.psd"`).
+- Alternatively, store large files in an external storage (e.g., S3) and reference them.
+
+## 5. Stale Local Branch
+
+**Symptoms**: Your branch diverges heavily from `develop`.
+
+**Solution**:
+- Rebase onto latest `develop`:
+  ```bash
+  git fetch origin
+  git rebase origin/develop
+  ```
+- Resolve any conflicts, then force‑push (`git push -f`).
+
+---
+
+For more detailed help, refer to the official Git documentation or contact the DevOps team.
+

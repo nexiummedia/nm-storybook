@@ -1,0 +1,6 @@
+{
+  "title": "Fundamentals",
+  "description": "Core frontend technologies, foundational concepts, and modern specifications.",
+  "pages": ["index", "html-css", "javascript", "typescript", "react", "nextjs"]
+}
+

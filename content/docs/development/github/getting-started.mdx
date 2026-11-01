@@ -1,0 +1,85 @@
+---
+title: "Getting Started"
+description: "Setup Git, clone the repository, and understand the basic workflow."
+---
+
+# Getting Started with Git & GitHub
+
+<Callout type="note">
+This guide assumes you have administrative access to the company repositories and a GitHub account associated with your Nexium Media email.
+</Callout>
+
+## Install Git
+
+```bash
+# macOS (Homebrew)
+brew install git
+
+# Windows (Chocolatey)
+choco install git
+```
+
+Verify the installation:
+
+```bash
+git --version
+```
+
+## Configure Your Identity
+
+```bash
+git config --global user.name "Your Name"
+git config --global user.email "you@company.com"
+```
+
+## Clone the Company Repository
+
+```bash
+git clone https://github.com/nexium-media/company-repo.git
+cd company-repo
+```
+
+## Branching Overview
+
+- `main` – stable production code.
+- `develop` – integration branch for upcoming releases.
+- Feature branches – short‑lived branches for individual work (see **Branch Naming**).
+
+## Syncing with Remote
+
+```bash
+# Fetch latest changes
+git fetch origin
+
+# Update your local main branch
+git checkout main
+git pull origin main
+```
+
+## Working with a Feature Branch
+
+```bash
+# Create a new branch
+git checkout -b feat/new-dashboard
+
+# Make changes, then stage and commit
+git add .
+git commit -m "feat(dashboard): add new analytics view"
+
+# Push your branch to GitHub
+git push -u origin feat/new-dashboard
+```
+
+## Pulling Latest Changes into Your Branch
+
+```bash
+git checkout develop
+git pull origin develop
+git checkout feat/new-dashboard
+git rebase develop
+```
+
+---
+
+For a deeper dive, see the subsequent sections on **Branch Naming**, **Commit Convention**, and **Pull Request Process**.
+

@@ -1,0 +1,81 @@
+---
+title: Code Review Standards & Checklist
+description: Engineering review expectations, automated PR checklists, constructive feedback conventions, and escalation procedures.
+---
+
+Code review is a core peer-learning, quality-assurance, and architectural alignment practice at Nexium Media. Across a team of over 100 developers, code reviews prevent architectural divergence, catch edge cases before deployment, and ensure shared ownership across our distributed engineering pods.
+
+This guide details author responsibilities, the reviewer checklist, structured feedback prefixes, and pull request sizing guidelines.
+
+## The Goals of Code Review
+
+1. **Verify Functional Correctness**: Confirm the implementation fulfills the business requirements outlined in the associated Jira/Linear issue without regressions.
+2. **Uphold Engineering Standards**: Ensure compliance with TypeScript strictness, accessibility benchmarks (WCAG 2.1 AA), and performance budgets.
+3. **Knowledge Sharing**: Spread familiarity with newly developed features, third-party libraries, and domain patterns across the pod.
+4. **Maintain Long-Term Maintainability**: Ensure new components are easy to read, well-documented, properly tested, and aligned with our existing design system.
+
+## Pull Request Size Guidelines
+
+Large pull requests receive lower-quality reviews because human review fatigue sets in quickly when reviewing hundreds of lines of code.
+
+- **Target Size**: Under **400 lines changed** (excluding auto-generated lockfiles or snapshots).
+- **Split Large Initiatives**: Break down large architectural changes into smaller, logical pull requests that can be merged sequentially behind feature flags.
+- **Atomic Commits**: Group changes into clear, descriptive commits adhering to the Conventional Commits specification (`feat:`, `fix:`, `refactor:`, `test:`).
+
+## Author Responsibilities Before Requesting Review
+
+Before moving a PR from "Draft" to "Ready for Review":
+
+1. **Conduct a Self-Review**: Read your own diff on GitHub. You will often spot left-over debug statements, temporary comments, or unformatted lines before asking a peer for their time.
+2. **Complete the PR Template**:
+   - Link the relevant Jira/Linear issue (`Fixes NX-1042`).
+   - Write a summary of what changed and **why**.
+   - Include before-and-after screenshots or screen recordings (Loom/GIF) for any visual changes.
+3. **Verify CI Passes Locally**: Ensure `npm run lint`, `npm run typecheck`, and `npm run test` pass cleanly before requesting review.
+
+## The Reviewer Checklist
+
+Reviewers must evaluate pull requests across eight distinct dimensions:
+
+```markdown
+### Code Review Evaluation Matrix
+
+- [ ] **1. Functionality**: Does the code accurately meet the requirements described in the issue? Are edge cases (empty states, errors, network failures) handled?
+- [ ] **2. TypeScript Strictness**: Are all types explicit? Are there zero occurrences of `any`? Is untrusted external data parsed with Zod schemas?
+- [ ] **3. Component Architecture**: Does each component have a single responsibility? Are variants handled via CVA rather than boolean prop traps? Are props properly typed and documented?
+- [ ] **4. Accessibility (a11y)**: Does the markup use semantic elements (`<button>`, `<main>`)? Are form controls labeled? Is keyboard navigation preserved with visible focus indicators?
+- [ ] **5. Web Performance**: Are there any unnecessary re-renders or un-memoized expensive calculations? Are images loaded via `next/image` with proper `sizes`? Are large modules dynamically imported?
+- [ ] **6. Automated Testing**: Do unit and integration tests accompany the change? Do tests verify actual user behavior rather than internal component implementation details?
+- [ ] **7. Application Security**: Are user inputs sanitized? Are server secrets kept out of `NEXT_PUBLIC_` variables? Are server actions authenticated server-side?
+- [ ] **8. Documentation & JSDoc**: Are newly introduced shared utilities, hooks, or component primitives documented with clear usage examples?
+```
+
+## Constructive Feedback Conventions
+
+Feedback should be specific, actionable, and objective. We use standardized prefixes to clarify the priority of review comments:
+
+| Prefix | Meaning | Blocking? | Example Comment |
+| :--- | :--- | :--- | :--- |
+| **`[BLOCKING]`** | Critical bug, security risk, severe performance degradation, or missing test coverage. | **Yes** | `[BLOCKING] Passing userWebsite directly to <a href> allows javascript: URI execution. Please sanitize with sanitizeUrl().` |
+| **`[SUGGESTION]`** | Proposed improvement or architectural alternative. | Discretionary | `[SUGGESTION] Consider using useMemo here since this filter iterates over 10,000 table rows.` |
+| **`[QUESTION]`** | Seeking clarification to better understand intent. | No | `[QUESTION] Could you clarify why we bypass the standard api-client here in favor of native fetch?` |
+| **`[NIT]`** | Minor polish, typo, or stylistic preference. | No | `[NIT] Typo in the error message string: "occurred" is misspelled.` |
+| **`[PRAISE]`** | Positive recognition of clean design or elegant problem-solving. | No | `[PRAISE] Excellent use of discriminated unions here to eliminate impossible loading states!` |
+
+<Callout type="tip">
+When suggesting an alternative implementation, always provide a concise code snippet or link to documentation illustrating the recommended approach.
+</Callout>
+
+## Resolving Discussions & Approval Policies
+
+- **Minimum Approval Gate**: Every pull request requires at least **one approval** from a senior frontend engineer or designated domain lead.
+- **Resolving Conversations**: Only the author of the pull request should click "Resolve Conversation", and only after pushing the requested changes or reaching agreement in the comment thread.
+- **Escalation**: If reviewers disagree on an architectural approach, escalate to the Pod Lead or Frontend Architect during daily standup or via a brief sync rather than engaging in prolonged comment debates.
+
+## Related
+
+- [Quality Standards Overview](/docs/development/frontend/quality)
+- [Accessibility Compliance Guide](/docs/development/frontend/quality/accessibility)
+- [Performance Optimization](/docs/development/frontend/quality/performance)
+- [Local Development Workflows](/docs/development/frontend/workflows/local-development)
+

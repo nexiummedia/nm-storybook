@@ -1,0 +1,46 @@
+---
+title: "Commit Convention"
+description: "Standard commit message format using Conventional Commits."
+---
+
+# Commit Convention
+
+<Callout type="tip">
+Adhering to a consistent commit format improves changelog generation and automation.
+</Callout>
+
+## Conventional Commits
+
+```
+<type>(<scope>): <description>
+```
+
+- **type** – required, one of `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `chore`, `build`, `ci`, `revert`.
+- **scope** – optional, indicates the part of the codebase (e.g., `auth`, `ui`).
+- **description** – short imperative summary.
+- **body** – optional detailed explanation.
+- **footer** – optional `BREAKING CHANGE:` description or issue references.
+
+## Examples
+
+```text
+feat(profile): add avatar upload UI
+
+fix(auth): resolve token refresh race condition
+
+chore(deps): bump lodash to 4.17.21
+
+refactor(api): simplify user service methods
+```
+
+## Rules
+
+1. Use present‑tense, imperative mood (`add`, `fix`, `remove`).
+2. Keep description ≤ 72 characters.
+3. If a change introduces a breaking change, add a `BREAKING CHANGE:` footer.
+4. Reference issues using `#` (e.g., `fix(auth): correct token handling (#123)`).
+
+---
+
+See the **Pull Request** guide for how to enforce these conventions during review.
+

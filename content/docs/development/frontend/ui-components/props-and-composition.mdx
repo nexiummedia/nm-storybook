@@ -1,0 +1,189 @@
+---
+title: Props & Component Composition
+description: Advanced React composition techniques, extending native HTML attributes, polymorphic components, and runtime prop contracts.
+---
+
+Composition is the primary mechanism for code reuse and UI flexibility in React. Developers frequently reach for props to handle every visual and behavioral variant, leading to "God Components"—unmaintainable components with dozens of conflicting props.
+
+This guide details best practices for typing prop interfaces, eliminating prop drilling through slot composition, building polymorphic components, and safely spreading DOM attributes.
+
+## Extending Native HTML Element Attributes
+
+When authoring a design system primitive, always extend the appropriate standard HTML attributes interface from `@types/react`. This ensures consumers can pass standard attributes (`id`, `aria-label`, `tabIndex`, `onFocus`) without requiring you to manually enumerate them in your component interface:
+
+```tsx
+import * as React from "react";
+
+// Extend native InputHTMLAttributes
+export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+  label: string;
+  error?: string;
+  hint?: string;
+}
+
+export const Input = React.forwardRef<HTMLInputElement, InputProps>(
+  ({ label, error, hint, id, className, ...rest }, ref) => {
+    // Generate fallback ID if not explicitly provided
+    const inputId = id ?? label.toLowerCase().replace(/\s+/g, "-");
+    const errorId = `${inputId}-error`;
+
+    return (
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor={inputId} className="text-sm font-medium text-slate-700">
+          {label}
+        </label>
+        <input
+          ref={ref}
+          id={inputId}
+          aria-invalid={!!error}
+          aria-describedby={error ? errorId : undefined}
+          className={`rounded-md border px-3 py-2 text-sm ${
+            error ? "border-red-500 focus:ring-red-500" : "border-slate-300 focus:ring-blue-500"
+          } ${className ?? ""}`}
+          {...rest}
+        />
+        {error && (
+          <p id={errorId} role="alert" className="text-xs text-red-600">
+            {error}
+          </p>
+        )}
+      </div>
+    );
+  }
+);
+
+Input.displayName = "Input";
+```
+
+<Callout type="tip">
+Always destructure `className` explicitly and merge it carefully with the component's internal style classes using `clsx` and `tailwind-merge` (`cn()`).
+</Callout>
+
+## Eliminating Prop Drilling with Children Composition
+
+**Prop drilling** occurs when data or callbacks are passed down through intermediate components that do not need them, simply to reach a deeply nested child.
+
+Instead of passing data down multi-tier component trees, pass the configured child component directly as `children`:
+
+```tsx
+// Anti-Pattern: Prop Drilling through PageLayout
+<PageLayout
+  userAvatarUrl={user.avatar}
+  userName={user.name}
+  notificationsCount={unreadCount}
+  onNotificationClick={openDrawer}
+  searchQuery={query}
+  onSearchChange={setQuery}
+/>
+
+// Best Practice: Composition with Slots / Children
+<PageLayout
+  header={
+    <Header>
+      <SearchBar value={query} onChange={setQuery} />
+      <NotificationBell count={unreadCount} onClick={openDrawer} />
+      <UserAvatar src={user.avatar} name={user.name} />
+    </Header>
+  }
+>
+  <DashboardContent />
+</PageLayout>
+```
+
+With composition, intermediate components like `PageLayout` only care about structure, while consumers retain direct access to the child components and their event handlers.
+
+## Polymorphic Components (`as` / `asChild` Pattern)
+
+A **polymorphic component** can render as different underlying HTML elements while preserving strict type safety for the corresponding element's attributes.
+
+### Radix `asChild` / Slot Pattern (Recommended)
+
+Nexium Media prefers Radix UI's `Slot` approach over the legacy `as` prop. The `asChild` prop merges component behavior and classes directly onto its immediate child element:
+
+```tsx
+import * as React from "react";
+import { Slot } from "@radix-ui/react-slot";
+import Link from "next/link";
+import { buttonVariants } from "@/components/ui/Button";
+
+interface ActionProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  asChild?: boolean;
+}
+
+export function Action({ asChild = false, className, ...props }: ActionProps) {
+  // If asChild is true, Slot merges props onto the Next.js <Link> child element
+  const Comp = asChild ? Slot : "button";
+  return <Comp className={buttonVariants({ variant: "primary", className })} {...props} />;
+}
+
+// Usage as standard button
+<Action onClick={() => alert("clicked")}>Standard Button</Action>
+
+// Usage as Next.js Link (renders an <a> tag, type-safe href)
+<Action asChild>
+  <Link href="/dashboard/campaigns">Navigate to Campaigns</Link>
+</Action>
+```
+
+## Safe Attribute Spreading: Rules of Rest
+
+When spreading remaining props (`...rest`) onto a target DOM element, follow these rules:
+
+1. **Destructure Known Custom Props First**: Always extract non-DOM props before spreading. Passing custom booleans (e.g., `<input isLoading={true} />`) directly to the DOM triggers React console warnings and invalid HTML.
+2. **Handle Event Chaining**: If your internal implementation needs an event listener (like `onClick`) and the consumer also passes an `onClick`, compose both handlers:
+
+```tsx
+function handleInternalClick(e: React.MouseEvent<HTMLButtonElement>) {
+  trackAnalytics("button_clicked");
+  // Execute consumer callback if provided
+  props.onClick?.(e);
+}
+```
+
+## Runtime Prop Validation with Zod
+
+For mission-critical components that process dynamic third-party configuration (e.g., dynamic CMS page builders or JSON schema renderers), validate incoming props at runtime:
+
+```tsx
+import { z } from "zod";
+
+export const DynamicCardPropsSchema = z.object({
+  title: z.string().min(1, "Title is required"),
+  targetUrl: z.string().url("Must be a valid target URL"),
+  displayBadge: z.boolean().default(false),
+});
+
+export type DynamicCardProps = z.infer<typeof DynamicCardPropsSchema>;
+
+export function DynamicCmsCard(rawProps: unknown) {
+  const result = DynamicCardPropsSchema.safeParse(rawProps);
+
+  if (!result.success) {
+    console.error("Malformed CMS card props:", result.error.format());
+    return <div className="text-xs text-red-500">Failed to render card: invalid schema</div>;
+  }
+
+  const { title, targetUrl, displayBadge } = result.data;
+
+  return (
+    <a href={targetUrl} className="block rounded border p-4">
+      <h4>{title}</h4>
+      {displayBadge && <span className="badge">Featured</span>}
+    </a>
+  );
+}
+```
+
+## Common Mistakes & Anti-Patterns
+
+1. **"God Components"**: A component that accepts 40 optional props to toggle different headings, buttons, tags, and layouts. Split it into composable subcomponents.
+2. **Implicit Interfaces**: Defining props as `props: any` or using undocumented object literals. Always export a named interface: `export interface CardProps`.
+3. **Overriding Key DOM Behavior**: Forgetting to forward the `ref` or omitting `...rest` props, which breaks library integrations like React Hook Form or Framer Motion.
+
+## Related
+
+- [UI Components Overview](/docs/development/frontend/ui-components)
+- [Component Design Principles](/docs/development/frontend/ui-components/component-design)
+- [Forms & Validation](/docs/development/frontend/ui-components/forms-and-validation)
+- [Component Library Architecture](/docs/development/frontend/ui-components/component-library)
+

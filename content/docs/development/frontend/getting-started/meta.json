@@ -1,0 +1,5 @@
+{
+  "title": "Getting Started",
+  "description": "Setup guide for frontend development environment.",
+  "pages": ["index", "installation", "development-environment", "project-setup"]
+}
